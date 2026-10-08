@@ -50,4 +50,39 @@ class FakeLLMProvider:
                     for index, (name, title, stance, profile) in enumerate(people[:count])
                 ],
             }
+        if schema_name == "TurnDecisionContract":
+            actions = ["speak", "rebut", "supplement", "raise_hand"]
+            index = int(digest[:2], 16) % len(actions)
+            return {
+                "action": actions[index],
+                "urgency": 52 + int(digest[2:4], 16) % 43,
+                "publicFocus": "正在核对上一条观点的证据和适用边界",
+                "targetMessageId": None,
+            }
+        if schema_name == "UtteranceResult":
+            if "阶段：opening" in user_prompt:
+                content = "欢迎来到今天的圆桌。请各位先说明最关键的判断标准，并指出它可能忽略什么。"
+            elif "阶段：conclusion" in user_prompt:
+                content = "今天的分歧集中在目标、证据与责任边界。下一步应验证关键假设，并明确哪些决定必须由人承担。"
+            else:
+                content = "这个判断不能只看短期效率，还要验证它对不同群体的影响。建议先建立可审计的证据标准，再决定自动化权限。"
+            return {"content": content}
+        if schema_name == "BranchSuggestion":
+            return {
+                "shouldCreate": True,
+                "branchType": "question",
+                "title": "如何验证关键假设",
+                "summary": "需要把观点转化为可观察、可比较的证据标准。",
+                "sourceMessageId": "latest",
+            }
+        if schema_name == "SessionSummaryResult":
+            return {
+                "focus": "讨论聚焦于效率、公平和责任边界。",
+                "viewpoints": ["支持用一致标准辅助决策", "强调偏差审计和人的最终责任"],
+                "disagreements": ["一致性是否足以代表公平"],
+                "consensus": ["高风险决定不能缺少人工复核"],
+                "openQuestions": ["如何定义可接受的偏差阈值"],
+                "nextSteps": ["建立审计指标", "设计候选人申诉流程"],
+                "naturalText": "本场讨论认为，AI 可以提升证据整理的一致性，但不应独自承担高风险终审。下一步应先建立偏差审计、人工复核和候选人申诉机制。",
+            }
         return {"schema": schema_name, "fixtureId": digest}

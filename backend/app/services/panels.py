@@ -1,15 +1,12 @@
-from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ..domain import ExpertKind, SessionStatus, TopicStatus
 from ..errors import AppError
-from ..llm import LLMProvider
+from ..llm import LLMCallTimeout, LLMInvalidOutput, LLMProvider, ValidatedLLMClient
+from ..llm.prompts import PANEL_SYSTEM
 from ..models import Expert, ExpertStatus, PanelSession, Topic
 from ..schemas import PanelGenerationResult, PanelRead, ExpertRead, SessionCreate
-
-
-PANEL_SYSTEM_PROMPT = """你是 AI 圆桌演播厅的选角编辑。请围绕用户话题生成一名中立主持人和指定数量、专业背景与立场互补的虚拟专家。只返回符合 PanelGenerationResult 的 JSON，不输出隐藏推理。"""
 
 
 class PanelService:
@@ -40,21 +37,19 @@ class PanelService:
             f"专家人数：{topic.requested_expert_count}\n"
         )
         try:
-            raw = await self.provider.complete_json(
-                system_prompt=PANEL_SYSTEM_PROMPT,
+            generated = await ValidatedLLMClient(self.provider).call(
+                PanelGenerationResult,
+                system_prompt=PANEL_SYSTEM,
                 user_prompt=user_prompt,
-                schema_name="PanelGenerationResult",
             )
-            generated = PanelGenerationResult.model_validate(raw)
-        except ValidationError as exc:
+        except LLMInvalidOutput as exc:
             raise AppError(
                 "LLM_INVALID_OUTPUT",
                 "模型返回的专家阵容不完整，请重试。",
                 status_code=502,
                 retryable=True,
-                details={"fields": [".".join(map(str, item["loc"])) for item in exc.errors()]},
             ) from exc
-        except TimeoutError as exc:
+        except LLMCallTimeout as exc:
             raise AppError(
                 "LLM_TIMEOUT", "生成专家阵容超时，请重试。", status_code=504, retryable=True
             ) from exc

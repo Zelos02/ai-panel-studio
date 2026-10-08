@@ -162,4 +162,4 @@
 - 种子命令在独立 SQLite 数据库成功创建 5 个话题、5 位主持人和 20 位立场不同的专家，并由自动化测试验证幂等性。
 - 后端 25 项、前端组件 3 项、Playwright 3 项全部通过；生产构建成功，移动端以 390 × 844 视口验收无横向溢出。
 - 扫描未发现 `sk-...` 形式的真实密钥；API Key 仍只从后端环境变量读取。
-- 对应提交：见 `git log` 中标题为 `docs: add seed data delivery guide and final audit` 的提交。
+- 对应提交：`0aec7f3 docs: add seed data delivery guide and final audit`

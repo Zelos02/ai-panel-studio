@@ -97,4 +97,20 @@
 
 - 后端完整 21 个测试通过，覆盖首次非法后修复、持续非法、超时、Fake 契约和 Gateway 专家身份绑定。
 - 阵容生成也统一接入 ValidatedLLMClient，不再绕过有限重试层。
+- 对应提交：`10cbfb5 feat: add validated LLM adapters and prompt contracts`
+
+## 记录 7：实时通信——SSE、事件持久化与前端增量更新
+
+### 实际 Prompt
+
+> 将 PanelOrchestrator 事件先写入 SQLite，再发布到按 Session 隔离的 EventHub；SSE 支持递增 eventId、回放、心跳和去重。前端用 EventSource 增量更新专家状态与 Transcript，切换页面时关闭旧连接。
+
+### 意图与过程
+
+采用“数据库是事实来源、内存 Hub 只负责低延迟通知”的方式，让浏览器断线后仍能回放。新增启动 API 测试时发现同步 FastAPI 路由运行在工作线程，无法创建 asyncio 后台任务；将端点改为异步路由后，任务正确绑定应用事件循环并通过回归。
+
+### 结果
+
+- 后端 24 个测试通过，覆盖后台启动、事件顺序、公开 Transcript、SSE 帧和跨会话隔离。
+- 前端 3 个测试通过，生产构建成功；SSE Hook 覆盖连接、重复 eventId 过滤和关闭清理。
 - 对应提交：待本阶段验收后填写。

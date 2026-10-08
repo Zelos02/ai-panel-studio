@@ -105,6 +105,42 @@ class SessionRead(ApiModel):
     started_at: datetime | None
     ended_at: datetime | None
 
+    @field_validator("created_at", "started_at", "ended_at", mode="before")
+    @classmethod
+    def ensure_session_utc(cls, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class TranscriptSpeakerRead(ApiModel):
+    id: str
+    name: str
+    title: str
+    color: str
+    role: str
+
+
+class TranscriptMessageRead(ApiModel):
+    id: str
+    sequence: int
+    content: str
+    created_at: datetime
+    speaker: TranscriptSpeakerRead
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def ensure_message_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class TranscriptList(ApiModel):
+    items: list[TranscriptMessageRead]
+
 
 class ErrorBody(ApiModel):
     code: str

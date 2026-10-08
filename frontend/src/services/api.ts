@@ -64,4 +64,7 @@ export const api = {
       body: JSON.stringify({ maxTurns }),
     });
   },
+  startSession(sessionId: string): Promise<SessionResource> {
+    return request(`/sessions/${sessionId}:start`, { method: "POST", body: "{}" });
+  },
 };

@@ -83,6 +83,31 @@ export interface SessionResource {
   endedAt: string | null;
 }
 
+export interface TranscriptResource {
+  id: string;
+  sequence: number;
+  content: string;
+  createdAt: string;
+  speaker: {
+    id: string;
+    name: string;
+    title: string;
+    color: string;
+    role: "host" | "expert";
+  };
+}
+
+export type SessionEventType = "session.state" | "expert.status" | "transcript.append" | "branch.created" | "summary.ready" | "stream.error" | "heartbeat";
+
+export interface SessionEvent<T = Record<string, unknown>> {
+  eventId: number;
+  topicId: string | null;
+  sessionId: string;
+  timestamp: string;
+  eventType: SessionEventType;
+  payload: T;
+}
+
 export interface NewTopicInput {
   title: string;
   background?: string;

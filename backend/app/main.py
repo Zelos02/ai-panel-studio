@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -7,10 +8,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from .api.routes import health_router, topics_router
+from .api.routes import health_router, sessions_router, topics_router
 from .config import Settings, get_settings
 from .database import create_database, init_database
 from .errors import AppError
+from .events import EventHub
 from .llm import build_llm_provider
 
 
@@ -19,9 +21,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     engine, session_factory = create_database(resolved_settings.database_url)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI):
+    async def lifespan(application: FastAPI):
         init_database(engine)
         yield
+        tasks = list(getattr(application.state, "discussion_tasks", {}).values())
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         engine.dispose()
 
     app = FastAPI(title="AI Panel Studio API", version="0.1.0", lifespan=lifespan)
@@ -29,6 +37,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.engine = engine
     app.state.session_factory = session_factory
     app.state.llm_provider = build_llm_provider(resolved_settings)
+    app.state.event_hub = EventHub()
+    app.state.discussion_tasks = {}
 
     app.add_middleware(
         CORSMiddleware,
@@ -101,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(health_router, prefix="/api/v1")
     app.include_router(topics_router, prefix="/api/v1")
+    app.include_router(sessions_router, prefix="/api/v1")
     return app
 
 

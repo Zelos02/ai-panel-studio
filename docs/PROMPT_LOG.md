@@ -129,4 +129,20 @@
 
 - 后端 24 个测试通过；新增断言证明分岔在 completed 事件之前出现、重复建议被去重、summary.ready 只含 naturalText。
 - 前端 3 个测试通过并成功构建；已支持恢复历史讨论、实时分岔、结束控制和自然语言总结面板。
+- 对应提交：`244fba1 feat: add knowledge branches summaries and topic isolation`
+
+## 记录 9：E2E——真实浏览器闭环与异常恢复
+
+### 实际 Prompt
+
+> 使用 Playwright 自动启动 FastAPI 与 Vite，采用独立 SQLite 和 Fake Provider，完成创建话题、阵容确认、实时讨论、分岔、总结、返回首页和历史恢复；另模拟模型生成 504，验证安全中文错误且不泄露堆栈或 Key。
+
+### 意图与过程
+
+端到端测试只验证真实用户能观察到的闭环，把模型非法 Schema、SSE 重复事件和跨会话隔离留给更确定的单元/集成层。Playwright 使用无界面 Chromium 与本地服务，完整流程无需真实模型或网络 API。
+
+### 结果
+
+- 2 个 Playwright 场景全部通过，主流程约 6 秒完成并成功恢复历史总结。
+- 需求验收矩阵将每项产品要求映射到实现与自动化证据。
 - 对应提交：待本阶段验收后填写。

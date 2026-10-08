@@ -8,16 +8,18 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "preview": "vite preview"
   },
   "dependencies": {
     "@vitejs/plugin-react": ">=4.3 <6",
-    "vite": ">=6 <8",
-    "typescript": ">=5.7 <6",
     "react": ">=19 <20",
-    "react-dom": ">=19 <20"
+    "react-dom": ">=19 <20",
+    "typescript": ">=5.7 <6",
+    "vite": ">=6 <8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": ">=6 <7",
     "@testing-library/react": ">=16 <17",
     "@types/react": ">=19 <20",

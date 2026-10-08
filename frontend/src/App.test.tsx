@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { BranchPanel } from "./components/BranchPanel";
 
 const topic = {
   id: "topic-1",
@@ -86,5 +87,28 @@ describe("App", () => {
     expect(within(dialog).getByText("请再次确认")).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "确认永久删除" }));
     await waitFor(() => expect(screen.queryByText(topic.title)).not.toBeInTheDocument());
+  });
+
+  it("shows accessible studio panes and reports observable branch counts", async () => {
+    const { unmount } = render(<App />);
+    await screen.findByText(topic.title);
+    fireEvent.click(screen.getByRole("button", { name: "进入演播厅" }));
+    await screen.findByRole("heading", { name: /嘉宾已经就位/ });
+    fireEvent.click(screen.getByRole("button", { name: /确认入场并创建演播厅/ }));
+
+    expect(await screen.findByRole("tablist", { name: "演播厅区域" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /观点现场/ })).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("tab", { name: /知识分岔/ }));
+    expect(screen.getByRole("tab", { name: /知识分岔/ })).toHaveAttribute("aria-selected", "true");
+    unmount();
+
+    render(<BranchPanel completed branches={[
+      { id: "b1", type: "conflict", title: "冲突", summary: "观点不同", sourceMessageId: "m1" },
+      { id: "b2", type: "question", title: "问题", summary: "仍待验证", sourceMessageId: "m2" },
+      { id: "b3", type: "concept", title: "概念", summary: "新概念", sourceMessageId: "m3" },
+    ]} />);
+    expect(screen.getByText("本场共沉淀 3 条知识分岔")).toBeInTheDocument();
+    expect(screen.getByText("1 个观点冲突 · 1 个待验证问题")).toBeInTheDocument();
+    expect(screen.queryByText("分歧正在收敛")).not.toBeInTheDocument();
   });
 });

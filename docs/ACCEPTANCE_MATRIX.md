@@ -20,7 +20,8 @@
 | 模型非法格式/超时 | ValidatedLLMClient、Pydantic JSON Schema 注入 | 重试、持续非法、超时、真实 Provider Schema 与字段纠错测试 | 通过 |
 | 安全错误提示 | Error Handler、ApiError | 422 测试、E2E 504 测试 | 通过 |
 | API Key 后端隔离 | Settings、Provider Factory | 默认 Fake 测试；仓库 `sk-...` 凭据扫描无结果 | 通过 |
-| 响应式演播厅 | 三栏/平板/移动 CSS | 前端构建、390 × 844 Playwright 视口测试 | 通过 |
+| 响应式演播厅 | 宽屏三栏、窄屏四区域标签 | 820px 标签切换与无横向溢出 E2E、390 × 844 首页测试 | 通过 |
+| 可信讨论信号 | BranchPanel 动态统计 | 组件测试验证分岔/冲突/待验证计数，无固定收敛值 | 通过 |
 | 历史恢复 | sessions/transcript/branches/summary API | Playwright 完成后重新进入 | 通过 |
 | 讨论删除 | Topic ORM cascade、运行态保护、双确认 UI | 级联删除测试、运行态 409、Playwright 管理场景 | 通过 |
 | 未开场阵容编辑 | generation、成员 ID/人数/状态校验 | API 编辑/锁定测试、组件与 Playwright 管理场景 | 通过 |
@@ -32,5 +33,6 @@
 1. 真实浏览器主流程：创建话题、3 位专家、确认入场、启动讨论、实时完成、分岔、总结、返回首页、重新进入并恢复。
 2. 模型生成超时：浏览器拦截生成 API 返回 504，页面展示可重试中文错误，不泄露堆栈或 Key。
 3. 移动端布局：390 × 844 视口下首页无横向溢出，创建话题弹窗完整位于视口内。
+4. 窄屏演播厅：820px 视口下依次访问观点、成员、分岔和总结，动态统计可见且无横向溢出。
 
 SSE 重复事件、模型非法 Schema、并发会话隔离等难以稳定地由浏览器制造的异常，分别在前端 Hook 测试和后端集成测试中覆盖。

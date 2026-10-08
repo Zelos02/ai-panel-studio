@@ -76,13 +76,14 @@
 | GET `/topics/{topicId}/experts` | 获取主持人与专家 | 200, 404 |
 | POST `/topics/{topicId}/sessions` | 基于已确认阵容创建 Session | 201, 409 |
 | GET `/sessions/{sessionId}` | 获取完整公开快照 | 200, 404 |
-| POST `/sessions/{sessionId}:start` | 启动或恢复讨论 | 202, 409 |
-| POST `/sessions/{sessionId}:pause` | 暂停讨论 | 202, 409 |
+| POST `/sessions/{sessionId}:start` | 启动讨论；状态为 paused 时可恢复 | 202, 409 |
 | POST `/sessions/{sessionId}:stop` | 请求主持人收尾 | 202, 409 |
-| POST `/sessions/{sessionId}/summary:retry` | 单独重试失败总结 | 202, 409 |
 | GET `/sessions/{sessionId}/transcript` | 分页获取 Transcript | 200, 404 |
 | GET `/sessions/{sessionId}/branches` | 获取知识分岔 | 200, 404 |
+| GET `/sessions/{sessionId}/summary` | 获取自然语言总结 | 200, 404 |
 | GET `/sessions/{sessionId}/events` | SSE 实时流与回放 | 200, 404, 409 |
+
+设计预留但当前 MVP 尚未暴露的端点：`POST /sessions/{sessionId}:pause` 与 `POST /sessions/{sessionId}/summary:retry`。`paused` 状态保留在领域模型中，供后续进程恢复和暂停能力使用；不得把这两个端点作为已交付功能演示。
 
 ### POST `/topics`
 

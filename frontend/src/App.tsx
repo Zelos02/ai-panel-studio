@@ -16,6 +16,7 @@ import { ApiError, api } from "./services/api";
 import type { BranchPreview, ExpertPreview, NewTopicInput, PanelResource, SessionEvent, SessionResource, TopicPreview, TopicResource, TranscriptPreview, TranscriptResource } from "./types";
 
 type View = "home" | "admission" | "studio";
+type StudioPane = "transcript" | "experts" | "branches" | "summary";
 
 function toTopicPreview(topic: TopicResource): TopicPreview {
   const progress = { draft: 8, ready: 18, running: 62, completed: 100, failed: 0 }[topic.status];
@@ -52,6 +53,7 @@ export default function App() {
   const [managerLoading, setManagerLoading] = useState(false);
   const [managerBusy, setManagerBusy] = useState(false);
   const [managerError, setManagerError] = useState<string | null>(null);
+  const [studioPane, setStudioPane] = useState<StudioPane>("transcript");
 
   useEffect(() => {
     void loadTopics();
@@ -220,7 +222,7 @@ export default function App() {
     finally { setBusy(false); }
   }
 
-  function leaveStudio() { setStreamEnabled(false); setView("home"); void loadTopics(); }
+  function leaveStudio() { setStreamEnabled(false); setStudioPane("transcript"); setView("home"); void loadTopics(); }
 
   if (view === "admission" && activeTopic && activePanel) {
     return <PanelAdmission topic={activeTopic} panel={activePanel} busy={busy} error={pageError} onBack={() => { setView("home"); setPageError(null); }} onRegenerate={() => void regeneratePanel()} onAdmit={() => void admitPanel()} />;
@@ -238,7 +240,17 @@ export default function App() {
           <div className="topbar-actions"><span className={`connection-pill connection-pill--${completed ? "completed" : connectionState}`}><i /> {completed ? "记录已同步" : connectionLabel(connectionState)}</span>{activeSession.status === "admitted" && <button className="primary-button" type="button" disabled={busy} onClick={() => void startDiscussion()}>{busy ? "正在启动…" : "启动讨论"}</button>}{running && <button className="danger-button" type="button" disabled={busy} onClick={() => void stopDiscussion()}>结束并总结</button>}</div>
         </header>
         {pageError && <div className="studio-error error-banner" role="alert">{pageError}</div>}
-        <main className="studio-grid"><ExpertRail experts={liveExperts} /><div className={`studio-center ${summaryText ? "studio-center--with-summary" : ""}`}><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} isCompleted={completed} />{summaryText && <SummaryPanel text={summaryText} />}</div><BranchPanel branches={liveBranches} /></main>
+        <main className={`studio-grid studio-grid--${studioPane}`}>
+          <nav className="studio-pane-tabs" aria-label="演播厅区域" role="tablist">
+            <button type="button" role="tab" aria-selected={studioPane === "transcript"} onClick={() => setStudioPane("transcript")}><span>观点现场</span><small>{liveTranscript.length}</small></button>
+            <button type="button" role="tab" aria-selected={studioPane === "experts"} onClick={() => setStudioPane("experts")}><span>圆桌成员</span><small>{liveExperts.length}</small></button>
+            <button type="button" role="tab" aria-selected={studioPane === "branches"} onClick={() => setStudioPane("branches")}><span>知识分岔</span><small>{liveBranches.length}</small></button>
+            <button type="button" role="tab" aria-selected={studioPane === "summary"} disabled={!summaryText} onClick={() => setStudioPane("summary")}><span>讨论总结</span><small>{summaryText ? "1" : "–"}</small></button>
+          </nav>
+          <ExpertRail experts={liveExperts} />
+          <div className={`studio-center ${summaryText ? "studio-center--with-summary" : ""}`}><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} isCompleted={completed} />{summaryText && <SummaryPanel text={summaryText} />}</div>
+          <BranchPanel branches={liveBranches} completed={completed} onOpenSource={() => setStudioPane("transcript")} />
+        </main>
         <footer className="studio-footer"><span>ROUND {String(activeSession.turnCount).padStart(2, "0")} / {activeSession.maxTurns}</span><div className="round-progress"><i style={{ width: `${progress}%` }} /></div><span>{running ? "专家正在自主判断发言时机" : activeSession.status === "completed" ? "讨论完成" : "等待主持人开场"}</span></footer>
       </div>
     );

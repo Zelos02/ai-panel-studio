@@ -45,6 +45,19 @@ test("completes and restores a full AI panel session", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "本场讨论总结" })).toBeVisible();
   await expect(page.getByText("如何验证关键假设")).toBeVisible();
+
+  await page.setViewportSize({ width: 820, height: 900 });
+  const paneTabs = page.getByRole("tablist", { name: "演播厅区域" });
+  await expect(paneTabs).toBeVisible();
+  await page.getByRole("tab", { name: /圆桌成员/ }).click();
+  await expect(page.getByRole("heading", { name: "圆桌成员" })).toBeVisible();
+  await page.getByRole("tab", { name: /知识分岔/ }).click();
+  await expect(page.getByRole("heading", { name: "知识分岔" })).toBeVisible();
+  await expect(page.getByText(/本场共沉淀 \d+ 条知识分岔/)).toBeVisible();
+  await page.getByRole("tab", { name: /讨论总结/ }).click();
+  await expect(page.getByRole("heading", { name: "本场讨论总结" })).toBeVisible();
+  const compactOverflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(compactOverflow).toBeLessThanOrEqual(1);
 });
 
 test("shows a safe retryable message when panel generation fails", async ({ page }) => {

@@ -2,7 +2,7 @@
 
 ## 1. 分阶段协作方式
 
-本项目没有使用“一条 Prompt 生成全部代码”的方式，而是先把测试题拆成 10 个可独立验收的阶段，并把当前版本保存在根目录 `AI_PANEL_STUDIO_PROMPTS.md`。实际开发由 Codex 工作模式执行；如果换成 Claude Code，流程不变：先读取公共约束和当前阶段 Prompt，只修改阶段范围内的文件，运行对应测试，人工核对结果，再创建独立 Git 提交。
+本项目没有使用“一条 Prompt 生成全部代码”的方式，而是先把测试题拆成 10 个可独立验收的初始阶段，随后增加 2 个基于真实使用反馈的产品迭代阶段，并把当前版本保存在根目录 `AI_PANEL_STUDIO_PROMPTS.md`。实际开发由 Codex 工作模式执行；如果换成 Claude Code，流程不变：先读取公共约束和当前阶段 Prompt，只修改阶段范围内的文件，运行对应测试，人工核对结果，再创建独立 Git 提交。
 
 应用运行时的模型通过 `LLMProvider` 隔离。测试和本地演示默认使用 deterministic Fake Provider；DeepSeek V4 Pro 或其他兼容 Chat Completions 的模型可以通过后端 `LLM_BASE_URL`、`LLM_MODEL` 和 `LLM_API_KEY` 接入。自动化测试不调用真实模型，这既避免成本和波动，也能准确判断失败来自业务实现还是模型输出。
 

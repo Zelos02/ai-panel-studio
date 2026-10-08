@@ -17,6 +17,8 @@
 - Transcript 与长总结独立滚动，完成态明确显示为归档记录。
 - deterministic Fake Provider：无 API Key、无外网也能演示和测试。
 - 5 组可重复导入的高质量预设话题与嘉宾阵容。
+- 窄屏使用四区域标签切换，成员、观点、知识分岔和总结不会因窗口缩小而丢失。
+- 知识分岔区只展示真实分岔、冲突和待验证问题计数，不使用无数据来源的固定“收敛分数”。
 
 ## 技术栈
 
@@ -40,6 +42,26 @@ scripts/                 Windows 下的安装、启动和测试脚本
 tests/e2e/               E2E 说明入口（实际用例位于 frontend/e2e）
 AI_PANEL_STUDIO_PROMPTS.md  分阶段开发 Prompt 与版本记录
 ```
+
+## 交付物对应关系
+
+| 测试题要求 | 对应文件或目录 | 说明 |
+| --- | --- | --- |
+| 完整项目源码 | `backend/`、`frontend/`、`scripts/` | 后端、前端、安装/运行/测试脚本 |
+| 数据库初始化脚本 | `backend/app/database.py`、`scripts/seed.ps1` | 启动时建表；Seed 脚本可重复执行 |
+| 至少 5 组高质量样例数据 | `backend/app/seed.py` | 5 个话题及各自主持人、4 位专家；`backend/tests/test_seed.py` 验证数量和幂等性 |
+| 产品需求与验收标准 | `docs/PRODUCT_SPEC.md`、`docs/ACCEPTANCE_MATRIX.md` | MVP 范围、用户流程和逐项验收映射 |
+| 架构与 Mermaid 图 | `docs/ARCHITECTURE.md` | 系统架构、状态机、时序图和故障边界 |
+| 数据模型与 ER 图 | `docs/DATA_MODEL.md` | SQLite 表、约束、级联关系和 Mermaid ER 图 |
+| API 文档 | `docs/API_CONTRACT.md` | REST、SSE、错误码与公开/内部数据边界 |
+| 测试代码与策略 | `backend/tests/`、`frontend/src/*.test.tsx`、`frontend/e2e/`、`docs/TEST_STRATEGY.md` | Pytest、Vitest、Playwright |
+| 运行、环境变量、技术选型、主要 API、已完成和后续方向 | `README.md` | 本文件相应章节 |
+| 核心 Prompt 记录（不少于 5 段） | `AI_PANEL_STUDIO_PROMPTS.md`、`docs/PROMPT_LOG.md` | 12 个规范 Prompt、13 条实际执行/修正记录；明确包含 SDD、DDD、TDD、E2E |
+| 开发过程与 AI 工作流说明 | `docs/DEVELOPMENT_WORKFLOW.md` | Codex/Claude Code 与 DeepSeek Provider 的协作方式、典型问题和工程化理解 |
+| 最终交付审计 | `docs/FINAL_AUDIT.md` | 测试结果、交付物、边界和复现入口 |
+| Git Commit 演进历史 | Git 仓库 `main` 分支与 GitHub Commits 页面 | 从文档/Schema、UI、测试到业务能力的分阶段提交 |
+
+压缩包不包含 `.git`、`.env`、本地 SQLite、`.venv`、`node_modules`、`dist`、测试报告或临时文件；Git 历史以 GitHub 仓库为准。解压后先按下文执行安装和 Seed，即可生成本地数据库与样例数据。
 
 ## 从零安装
 
@@ -151,7 +173,7 @@ E2E 默认使用 `18000` 和 `15173` 两个独立端口，因此日常开发服�
 
 ## UI 设计方向
 
-界面采用深色“数据演播厅”风格：桌面端为专家状态、Transcript、知识分岔三栏，各区域独立滚动；平板减少侧栏；手机聚焦 Transcript，并将总结浮层化。专家专属颜色在阵容卡、状态卡与发言记录之间保持一致。
+界面采用深色“数据演播厅”风格：宽屏为专家状态、Transcript、知识分岔三栏，各区域独立滚动；视口不足 1180px 时改为成员、观点、分岔、总结四个标签，保留全部信息且不产生横向滚动。专家专属颜色在阵容卡、状态卡与发言记录之间保持一致。
 
 ## DeepSeek 缓存与调用成本
 

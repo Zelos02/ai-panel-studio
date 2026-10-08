@@ -75,8 +75,8 @@ stateDiagram-v2
     [*] --> created
     created --> admitted: 锁定阵容
     admitted --> running: 用户启动
-    running --> paused: 用户暂停/可恢复中断
-    paused --> running: 用户继续
+    running -.-> paused: 后续暂停/恢复能力预留
+    paused -.-> running: start 可恢复预留状态
     running --> stopping: 用户停止或满足结束条件
     stopping --> completed: 主持人收尾并生成总结
     created --> failed
@@ -144,8 +144,8 @@ sequenceDiagram
 - 模型非法输出：Schema 校验失败，有限修复重试；仍失败则产生安全错误事件并恢复专家状态。
 - SSE 断开：事件先落库；客户端携带 Last-Event-ID 重连并补发。
 - 重复请求：生成阵容、确认和启动接口支持幂等键或状态检查。
-- 进程重启：运行中 Session 标记为 paused，用户可恢复或停止；MVP 不假设后台任务跨进程存活。
-- 总结失败：保留完整 Transcript，允许单独重试总结。
+- 进程重启：MVP 不保证运行中的后台任务自动恢复；已持久化的 Transcript、分岔与已完成总结仍可读取。生产化需要启动时检查点与持久化任务队列。
+- 总结失败：保留完整 Transcript；单独重试总结是后续计划，当前未暴露公开端点。
 
 ## 10. 安全边界
 

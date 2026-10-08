@@ -216,4 +216,4 @@ Fake Provider 直接按代码构造正确字典，掩盖了 OpenAI-compatible Pr
 - 宽屏维持三栏布局，窄屏通过标签访问四个区域，点击来源发言会自动切回观点现场。
 - 讨论统计随 `branch.created` 和历史恢复结果自动变化，完成态只陈述沉淀数量，不声称分歧已经解决。
 - 前端组件 5 项、生产构建和 Playwright 4 项通过；E2E 在 820px 视口逐一验证四个区域及横向溢出。
-- 建议提交：`feat: preserve studio context on compact screens`
+- 对应提交：`bb661af feat: preserve studio context on compact screens`

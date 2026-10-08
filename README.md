@@ -106,6 +106,8 @@ LLM_MODEL=your-model-name
 
 DeepSeek 等提供 OpenAI-compatible Chat Completions 接口的模型可通过同一适配层配置。模型名称与 Base URL 以实际供应商控制台为准。严禁把 `.env`、Key 或含 Key 的日志提交到仓库。
 
+如果页面提示“模型返回的专家阵容不完整”，先确认 `LLM_PROVIDER=openai_compatible` 并重启后端。后端日志会列出未通过契约的字段路径，但不会打印模型原文或 API Key。
+
 ## 测试
 
 运行全部检查：

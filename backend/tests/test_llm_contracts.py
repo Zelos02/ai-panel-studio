@@ -6,15 +6,18 @@ from app.llm import FakeLLMProvider, LLMAgentGateway, LLMCallTimeout, LLMInvalid
 from app.llm.contracts import BranchSuggestion, SessionSummaryResult, TurnDecisionContract, UtteranceResult
 from app.llm.prompts import BRANCH_SYSTEM, EXPERT_UTTERANCE_SYSTEM, SUMMARY_SYSTEM, TURN_DECISION_SYSTEM
 from app.orchestration import AgentProfile, PanelRunState
+from app.schemas import PanelGenerationResult
 
 
 class SequenceProvider:
     def __init__(self, responses):
         self.responses = iter(responses)
         self.calls = 0
+        self.system_prompts = []
 
     async def complete_json(self, **kwargs):
         self.calls += 1
+        self.system_prompts.append(kwargs["system_prompt"])
         return next(self.responses)
 
 
@@ -36,6 +39,35 @@ async def test_invalid_output_is_retried_then_validated():
 
     assert result.action == "rebut"
     assert provider.calls == 2
+
+
+@pytest.mark.asyncio
+async def test_exact_json_schema_and_repair_feedback_are_sent_to_real_provider():
+    participant = {
+        "name": "林澈",
+        "title": "组织心理学研究员",
+        "stance": "反对完全自动化",
+        "publicProfile": "关注公平与候选人体验",
+        "color": "#B49CFF",
+    }
+    provider = SequenceProvider(
+        [
+            {"host": {"name": "主持人"}, "experts": []},
+            {"host": {**participant, "name": "周岚"}, "experts": [participant, participant]},
+        ]
+    )
+
+    result = await ValidatedLLMClient(provider).call(
+        PanelGenerationResult,
+        system_prompt="生成阵容，只返回 JSON。",
+        user_prompt="专家人数：2",
+    )
+
+    assert len(result.experts) == 2
+    assert '"publicProfile"' in provider.system_prompts[0]
+    assert '"pattern":"^#[0-9A-Fa-f]{6}$"' in provider.system_prompts[0]
+    assert "上一次响应未通过契约校验" in provider.system_prompts[1]
+    assert "host.title" in provider.system_prompts[1]
 
 
 @pytest.mark.asyncio

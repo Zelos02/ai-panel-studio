@@ -6,7 +6,7 @@
 
 | 检查项 | 结果 | 证据 |
 | --- | --- | --- |
-| 后端自动化 | 通过 | Pytest 25/25 |
+| 后端自动化 | 通过 | Pytest 26/26 |
 | 前端组件 | 通过 | Vitest 3/3 |
 | 前端生产构建 | 通过 | TypeScript 与 Vite 构建成功 |
 | 浏览器端到端 | 通过 | Playwright Chromium 3/3 |

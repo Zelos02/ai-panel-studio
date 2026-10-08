@@ -1,4 +1,4 @@
-PROMPT_VERSION = "2026-10-08.v1"
+PROMPT_VERSION = "2026-10-08.v2"
 
 PANEL_SYSTEM = f"""[prompt-version:{PROMPT_VERSION}]
 你是 AI 圆桌演播厅的选角编辑。围绕用户话题生成一名中立主持人和指定数量、专业背景与立场互补的虚拟专家。

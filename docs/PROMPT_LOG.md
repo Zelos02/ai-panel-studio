@@ -163,3 +163,20 @@
 - 后端 25 项、前端组件 3 项、Playwright 3 项全部通过；生产构建成功，移动端以 390 × 844 视口验收无横向溢出。
 - 扫描未发现 `sk-...` 形式的真实密钥；API Key 仍只从后端环境变量读取。
 - 对应提交：`0aec7f3 docs: add seed data delivery guide and final audit`
+
+## 记录 11：真实模型兼容性——Schema 注入与纠错重试
+
+### 实际 Prompt
+
+> 修复 DeepSeek 返回 `PanelGenerationResult` 连续校验失败的问题：先用测试证明真实 Provider 没有收到完整字段契约，再将 Pydantic JSON Schema 注入每次调用；第二次尝试只反馈错误字段路径并要求完整重写，日志不得记录模型原文或密钥。
+
+### 意图与过程
+
+Fake Provider 直接按代码构造正确字典，掩盖了 OpenAI-compatible Provider 只收到 Schema 名称、并不知道 `host`、`experts`、`publicProfile` 和颜色格式等真实约束的问题。新增测试先确认修复前 Prompt 中没有字段 Schema；随后由调用器统一导出带别名和约束的 JSON Schema，并在失败后反馈安全的字段路径。该发现补充了 Prompt 6 的验收要求，因此主 Prompt 升级为 v1.2。
+
+### 结果
+
+- 新测试证明阵容 Schema、颜色正则、字段别名和第二次纠错提示均会传给真实 Provider。
+- 日志只记录契约名、尝试次数和缺失字段路径，不记录原始模型响应。
+- 模型契约专项 6 项、后端完整 26 项通过。
+- 对应提交：本记录随标题为 `fix: inject model schemas into provider prompts` 的提交写入。

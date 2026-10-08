@@ -8,6 +8,7 @@
 
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
+| v1.2 | 2026-10-08 | Prompt 6 明确要求每次真实 Provider 调用都注入由 Pydantic 导出的完整 JSON Schema，并在有限重试时提供不含原始内容的字段级修正提示。 |
 | v1.1 | 2026-10-08 | Prompt 4 明确持久化阵容 generation，并要求用版本号阻止确认已被重新生成替换的旧阵容。 |
 | v1.0 | 2026-10-08 | 根据测试题要求建立 10 个分阶段 Prompt。 |
 
@@ -185,14 +186,15 @@
 
 1. 建立可版本化模板：嘉宾生成、专家决策、专家发言、主持人发言、分岔判断和总结。
 2. 定义 GuestGenerationResult、TurnDecision、UtteranceResult、BranchSuggestion、SessionSummaryResult。
-3. 校验无效 JSON、缺失字段、未知枚举、超长和空内容。
-4. 对可恢复错误有限重试，禁止无限循环。
-5. 实现超时、取消、速率限制、网络失败和 Provider 错误映射。
-6. Provider 可替换，可配置 DeepSeek 或其他 OpenAI-compatible 模型。
-7. API Key 只存在于后端环境变量。
-8. 日志只记录请求 ID、耗时、模型名和错误类型。
-9. 不请求 chain-of-thought，只请求结构化决定、公开摘要和答案。
-10. 使用 Mock/Fake Provider 测试成功、格式错误、超时和重试。
+3. 每次真实 Provider 调用都必须收到由对应 Pydantic Contract 导出的完整 JSON Schema，包含字段别名、枚举、数量、长度和格式约束；不能只传 Schema 名称。
+4. 校验无效 JSON、缺失字段、未知枚举、超长和空内容。
+5. 对可恢复错误有限重试，禁止无限循环；重试只反馈错误字段路径和约束，不记录或回显原始模型内容。
+6. 实现超时、取消、速率限制、网络失败和 Provider 错误映射。
+7. Provider 可替换，可配置 DeepSeek 或其他 OpenAI-compatible 模型。
+8. API Key 只存在于后端环境变量。
+9. 日志只记录请求 ID、耗时、模型名和错误类型。
+10. 不请求 chain-of-thought，只请求结构化决定、公开摘要和答案。
+11. 使用 Mock/Fake Provider 测试成功、格式错误、超时、Schema 注入和重试修正提示。
 
 验收：切换模型不改领域逻辑；格式错误不使讨论崩溃；输出入业务层前均经过校验；浏览器产物无 Key。
 

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -7,6 +8,20 @@ const rootDir = path.resolve(frontendDir, "..");
 const backendDir = path.join(rootDir, "backend");
 const pythonPackages = path.join(rootDir, ".python-packages");
 const databasePath = path.join(rootDir, ".tmp", "e2e-panel-studio.db").replaceAll("\\", "/");
+const venvPython = path.join(
+  rootDir,
+  ".venv",
+  process.platform === "win32" ? "Scripts/python.exe" : "bin/python",
+);
+const defaultPython = existsSync(venvPython)
+  ? `"${venvPython}"`
+  : process.platform === "win32"
+    ? "py -3.13"
+    : "python3";
+const pythonCommand = process.env.E2E_PYTHON ?? defaultPython;
+const pythonSearchPaths = existsSync(pythonPackages)
+  ? [pythonPackages, backendDir]
+  : [backendDir];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -24,11 +39,11 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: "py -3.13 -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+      command: `${pythonCommand} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
       cwd: backendDir,
       env: {
         ...process.env,
-        PYTHONPATH: `${pythonPackages};${backendDir}`,
+        PYTHONPATH: process.env.E2E_PYTHONPATH ?? pythonSearchPaths.join(path.delimiter),
         APP_ENV: "test",
         DATABASE_URL: `sqlite:///${databasePath}`,
         LLM_PROVIDER: "fake",

@@ -51,3 +51,17 @@ test("shows a safe retryable message when panel generation fails", async ({ page
   await expect(alert).not.toContainText("Traceback");
   await expect(alert).not.toContainText("LLM_API_KEY");
 });
+
+test("keeps the mobile home and dialog within the viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /别只要答案/ })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+
+  await page.getByRole("button", { name: /发起新讨论/ }).click();
+  await expect(page.getByRole("dialog", { name: /把一个难题带上圆桌/ })).toBeVisible();
+  const dialogBox = await page.getByRole("dialog").boundingBox();
+  expect(dialogBox?.x ?? -1).toBeGreaterThanOrEqual(0);
+  expect((dialogBox?.x ?? 0) + (dialogBox?.width ?? 999)).toBeLessThanOrEqual(390);
+});

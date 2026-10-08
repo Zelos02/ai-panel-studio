@@ -29,6 +29,7 @@ erDiagram
       text background
       text goal
       int requested_expert_count
+      int panel_generation
       string status
       datetime created_at
       datetime updated_at
@@ -121,6 +122,7 @@ erDiagram
 | background | 可空，最多 4000 字符 |
 | goal | 可空，最多 2000 字符 |
 | requested_expert_count | 2～8，默认 4 |
+| panel_generation | 当前阵容版本，首次生成后为 1，每次重新生成递增 |
 | status | draft/ready/running/completed/failed |
 | version | 乐观锁，默认 1 |
 

@@ -40,6 +40,7 @@ class Topic(TimestampMixin, Base):
     background: Mapped[str | None] = mapped_column(Text)
     goal: Mapped[str | None] = mapped_column(Text)
     requested_expert_count: Mapped[int] = mapped_column(Integer, default=4)
+    panel_generation: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default=TopicStatus.DRAFT.value)
     version: Mapped[int] = mapped_column(Integer, default=1)
 

@@ -29,6 +29,7 @@ class TopicRead(ApiModel):
     background: str | None
     goal: str | None
     requested_expert_count: int
+    panel_generation: int
     status: str
     created_at: datetime
     updated_at: datetime
@@ -50,6 +51,59 @@ class HealthRead(ApiModel):
     status: str
     environment: str
     llm_provider: str
+
+
+class GeneratedParticipant(ApiModel):
+    name: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=160)
+    stance: str = Field(min_length=1, max_length=1000)
+    public_profile: str = Field(min_length=1, max_length=1000)
+    color: str = Field(pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class PanelGenerationResult(ApiModel):
+    host: GeneratedParticipant
+    experts: list[GeneratedParticipant] = Field(min_length=2, max_length=8)
+
+
+class ExpertRead(ApiModel):
+    id: str
+    topic_id: str
+    kind: str
+    name: str
+    title: str
+    stance: str
+    public_profile: str
+    color: str
+    display_order: int
+    admitted: bool
+
+
+class PanelRead(ApiModel):
+    topic_id: str
+    generation: int
+    host: ExpertRead
+    experts: list[ExpertRead]
+
+
+class PanelAdmitRequest(ApiModel):
+    generation: int = Field(ge=1)
+
+
+class SessionCreate(ApiModel):
+    max_turns: int = Field(default=18, ge=4, le=60)
+
+
+class SessionRead(ApiModel):
+    id: str
+    topic_id: str
+    status: str
+    turn_count: int
+    max_turns: int
+    last_event_sequence: int
+    created_at: datetime
+    started_at: datetime | None
+    ended_at: datetime | None
 
 
 class ErrorBody(ApiModel):

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { ExpertPreview, TranscriptPreview } from "../types";
 
-export function TranscriptPanel({ experts, transcript }: { experts: ExpertPreview[]; transcript: TranscriptPreview[] }) {
+export function TranscriptPanel({ experts, transcript, isRunning = false }: { experts: ExpertPreview[]; transcript: TranscriptPreview[]; isRunning?: boolean }) {
   const people = new Map(experts.map((expert) => [expert.id, expert]));
   return (
     <section className="studio-panel transcript-panel" aria-labelledby="transcript-heading">
@@ -10,6 +10,9 @@ export function TranscriptPanel({ experts, transcript }: { experts: ExpertPrevie
         <div className="live-indicator" aria-label="直播进行中"><span />LIVE</div>
       </div>
       <div className="transcript-scroll" aria-live="polite">
+        {transcript.length === 0 && (
+          <div className="empty-stage"><span aria-hidden="true">◌</span><strong>阵容已经就位</strong><p>启动讨论后，主持人与专家的发言会在这里实时出现。</p></div>
+        )}
         {transcript.map((message, index) => {
           const speaker = people.get(message.speakerId);
           if (!speaker) return null;
@@ -27,9 +30,7 @@ export function TranscriptPanel({ experts, transcript }: { experts: ExpertPrevie
             </article>
           );
         })}
-        <div className="composing-row" aria-label="林澈正在发言">
-          <span className="mini-wave" aria-hidden="true"><i /><i /><i /><i /></span>林澈正在组织观点…
-        </div>
+        {isRunning && <div className="composing-row" aria-label="专家正在组织观点"><span className="mini-wave" aria-hidden="true"><i /><i /><i /><i /></span>专家正在组织观点…</div>}
       </div>
     </section>
   );

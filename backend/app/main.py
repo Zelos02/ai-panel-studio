@@ -11,6 +11,7 @@ from .api.routes import health_router, topics_router
 from .config import Settings, get_settings
 from .database import create_database, init_database
 from .errors import AppError
+from .llm import build_llm_provider
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -27,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = resolved_settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+    app.state.llm_provider = build_llm_provider(resolved_settings)
 
     app.add_middleware(
         CORSMiddleware,

@@ -1,0 +1,28 @@
+{
+  "name": "ai-panel-studio-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": ">=4.3 <6",
+    "vite": ">=6 <8",
+    "typescript": ">=5.7 <6",
+    "react": ">=19 <20",
+    "react-dom": ">=19 <20"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": ">=6 <7",
+    "@testing-library/react": ">=16 <17",
+    "@types/react": ">=19 <20",
+    "@types/react-dom": ">=19 <20",
+    "jsdom": ">=25 <28",
+    "vitest": ">=3 <5"
+  }
+}

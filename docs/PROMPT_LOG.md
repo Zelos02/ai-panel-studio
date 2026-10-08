@@ -17,3 +17,19 @@
 - 生成产品规格、架构、数据模型、API 契约和测试策略。
 - 建立需求 ID 与测试追踪矩阵。
 - 对应提交：待本阶段验收后填写。
+
+## 记录 2：基础工程——前后端骨架、SQLite 与 Provider 边界
+
+### 实际 Prompt
+
+> 按 SDD 契约建立 React/Vite 前端、FastAPI/SQLAlchemy 后端、完整 SQLite 实体、话题 CRUD、统一错误结构，以及可替换的 OpenAI-compatible/Fake LLMProvider；所有测试默认离线运行。
+
+### 意图与过程
+
+先把存储、HTTP 和模型调用边界固定下来，让后续 UI 与编排器可以分别迭代。实际遇到 Windows 沙箱无法解析含中文用户名的系统临时目录，以及 SQLite 读取时间后丢失时区的问题；通过把测试临时目录固定到项目内、在 API Schema 统一补齐 UTC 时区，并修正 Vitest/TypeScript 配置完成验证。
+
+### 结果
+
+- 后端 4 个测试通过，前端 1 个测试通过，前端生产构建成功。
+- 真实 Key 只由后端配置读取，默认 Fake Provider 可离线工作。
+- 对应提交：待本阶段验收后填写。

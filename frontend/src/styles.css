@@ -1,0 +1,53 @@
+:root {
+  color: #edf5ff;
+  background: #07111f;
+  font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(53, 214, 190, 0.12), transparent 34rem),
+    #07111f;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  place-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  color: #69e4ce;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.24em;
+}
+
+h1 {
+  max-width: 16ch;
+  margin: 0.7rem auto;
+  font-size: clamp(2.4rem, 8vw, 5rem);
+  line-height: 0.98;
+}
+
+.lede {
+  color: #94a9bf;
+}

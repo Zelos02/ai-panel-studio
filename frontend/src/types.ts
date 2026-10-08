@@ -71,6 +71,12 @@ export interface PanelResource {
   experts: ExpertResource[];
 }
 
+export interface PanelUpdateInput {
+  generation: number;
+  host: ExpertResource;
+  experts: ExpertResource[];
+}
+
 export interface SessionResource {
   id: string;
   topicId: string;

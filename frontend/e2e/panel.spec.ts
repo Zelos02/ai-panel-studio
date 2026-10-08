@@ -24,10 +24,24 @@ test("completes and restores a full AI panel session", async ({ page }) => {
   expect(await page.locator(".message").count()).toBeGreaterThan(4);
   await expect(page.locator(".summary-panel p")).not.toContainText("{");
 
+  const transcriptBox = await page.locator(".transcript-panel").boundingBox();
+  const summaryBox = await page.locator(".summary-panel").boundingBox();
+  const gridBox = await page.locator(".studio-grid").boundingBox();
+  expect(transcriptBox?.height ?? 0).toBeGreaterThan(250);
+  expect((summaryBox?.y ?? 0) + (summaryBox?.height ?? 9999)).toBeLessThanOrEqual(
+    (gridBox?.y ?? 0) + (gridBox?.height ?? 0) + 1,
+  );
+  const summaryOverflow = await page.locator(".summary-panel__scroll").evaluate((element) => {
+    const paragraph = element.querySelector("p");
+    if (paragraph) paragraph.textContent = `${paragraph.textContent}\n\n`.repeat(30);
+    return { clientHeight: element.clientHeight, scrollHeight: element.scrollHeight };
+  });
+  expect(summaryOverflow.scrollHeight).toBeGreaterThan(summaryOverflow.clientHeight);
+
   await page.locator(".brand-button").click();
   const topicCard = page.locator(".topic-card").filter({ hasText: title });
   await expect(topicCard).toBeVisible();
-  await topicCard.getByRole("button").click();
+  await topicCard.getByRole("button", { name: "查看复盘" }).click();
 
   await expect(page.getByRole("heading", { name: "本场讨论总结" })).toBeVisible();
   await expect(page.getByText("如何验证关键假设")).toBeVisible();
@@ -64,4 +78,28 @@ test("keeps the mobile home and dialog within the viewport", async ({ page }) =>
   const dialogBox = await page.getByRole("dialog").boundingBox();
   expect(dialogBox?.x ?? -1).toBeGreaterThanOrEqual(0);
   expect((dialogBox?.x ?? 0) + (dialogBox?.width ?? 999)).toBeLessThanOrEqual(390);
+});
+
+test("edits and deletes an unstarted discussion from management", async ({ page }) => {
+  const title = `E2E 管理讨论 ${Date.now()}`;
+  await page.goto("/");
+  await page.getByRole("button", { name: /发起新讨论/ }).click();
+  await page.getByLabel("讨论主题").fill(title);
+  await page.getByLabel("专家人数").selectOption("2");
+  await page.getByRole("button", { name: /生成专家阵容/ }).click();
+  await expect(page.getByRole("heading", { name: /嘉宾已经就位/ })).toBeVisible();
+  await page.locator(".brand-button").click();
+
+  const card = page.locator(".topic-card").filter({ hasText: title });
+  await card.getByRole("button", { name: `管理讨论：${title}` }).click();
+  const dialog = page.getByRole("dialog", { name: "管理讨论" });
+  const hostCard = dialog.locator(".manager-member").first();
+  await hostCard.getByLabel("姓名").fill("编辑后的主持人");
+  await dialog.getByRole("button", { name: "保存阵容修改" }).click();
+  await expect(dialog.getByText("版本 #2")).toBeVisible();
+
+  await dialog.getByRole("button", { name: "删除这场讨论" }).click();
+  await expect(dialog.getByText("请再次确认")).toBeVisible();
+  await dialog.getByRole("button", { name: "确认永久删除" }).click();
+  await expect(page.locator(".topic-card").filter({ hasText: title })).toHaveCount(0);
 });

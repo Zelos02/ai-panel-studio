@@ -1,7 +1,9 @@
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..domain import SessionStatus
 from ..errors import AppError
-from ..models import Topic
+from ..models import PanelSession, Topic
 from ..repositories import TopicRepository
 from ..schemas import TopicCreate
 
@@ -32,3 +34,28 @@ class TopicService:
 
     def list_recent(self, limit: int = 20) -> list[Topic]:
         return self.repository.list_recent(limit)
+
+    def delete(self, topic_id: str) -> None:
+        topic = self.get(topic_id)
+        active_session = self.session.scalar(
+            select(PanelSession.id)
+            .where(
+                PanelSession.topic_id == topic_id,
+                PanelSession.status.in_(
+                    [
+                        SessionStatus.RUNNING.value,
+                        SessionStatus.PAUSED.value,
+                        SessionStatus.STOPPING.value,
+                    ]
+                ),
+            )
+            .limit(1)
+        )
+        if active_session is not None:
+            raise AppError(
+                "TOPIC_DELETE_LOCKED",
+                "正在进行或暂停中的讨论不能删除，请先结束讨论。",
+                status_code=409,
+            )
+        self.session.delete(topic)
+        self.session.commit()

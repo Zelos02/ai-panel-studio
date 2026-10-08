@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
@@ -31,6 +31,11 @@ beforeEach(() => {
     const url = String(input);
     if (url.endsWith("/topics") && !init?.method) return jsonResponse({ items: [topic], nextCursor: null });
     if (url.endsWith("/experts")) return jsonResponse(panel);
+    if (url.endsWith("/panel") && init?.method === "PUT") {
+      const body = JSON.parse(String(init.body));
+      return jsonResponse({ ...panel, generation: 2, host: { ...host, ...body.host } });
+    }
+    if (url.endsWith("/topics/topic-1") && init?.method === "DELETE") return Promise.resolve(new Response(null, { status: 204 }));
     if (url.endsWith("/panel:admit")) return jsonResponse({ ...panel, host: { ...host, admitted: true }, experts: experts.map((item) => ({ ...item, admitted: true })) });
     if (url.endsWith("/sessions") && !init?.method) return jsonResponse({ items: [] });
     if (url.endsWith("/sessions") && init?.method === "POST") return jsonResponse({ id: "session-1", topicId: "topic-1", status: "admitted", turnCount: 0, maxTurns: 18, lastEventSequence: 0, createdAt: "2026-10-08T04:10:00Z", startedAt: null, endedAt: null }, 201);
@@ -61,5 +66,25 @@ describe("App", () => {
     expect(screen.getByText("阵容已经就位")).toBeInTheDocument();
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringContaining("/panel:admit"), expect.objectContaining({ method: "PUT" })));
     expect(screen.queryByText("raise_hand")).not.toBeInTheDocument();
+  });
+
+  it("edits an unstarted panel and requires two steps to delete a discussion", async () => {
+    render(<App />);
+    await screen.findByText(topic.title);
+    fireEvent.click(screen.getByRole("button", { name: `管理讨论：${topic.title}` }));
+
+    const dialog = await screen.findByRole("dialog", { name: "管理讨论" });
+    const nameInputs = await within(dialog).findAllByLabelText("姓名");
+    fireEvent.change(nameInputs[0], { target: { value: "新主持人" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存阵容修改" }));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/panel"),
+      expect.objectContaining({ method: "PUT" }),
+    ));
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "删除这场讨论" }));
+    expect(within(dialog).getByText("请再次确认")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认永久删除" }));
+    await waitFor(() => expect(screen.queryByText(topic.title)).not.toBeInTheDocument());
   });
 });

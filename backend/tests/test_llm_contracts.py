@@ -5,7 +5,7 @@ import pytest
 from app.llm import FakeLLMProvider, LLMAgentGateway, LLMCallTimeout, LLMInvalidOutput, ValidatedLLMClient
 from app.llm.contracts import BranchSuggestion, SessionSummaryResult, TurnDecisionContract, UtteranceResult
 from app.llm.prompts import BRANCH_SYSTEM, EXPERT_UTTERANCE_SYSTEM, SUMMARY_SYSTEM, TURN_DECISION_SYSTEM
-from app.orchestration import AgentProfile, PanelRunState
+from app.orchestration import AgentProfile, PanelRunState, TranscriptEntry
 from app.schemas import PanelGenerationResult
 
 
@@ -14,10 +14,12 @@ class SequenceProvider:
         self.responses = iter(responses)
         self.calls = 0
         self.system_prompts = []
+        self.user_prompts = []
 
     async def complete_json(self, **kwargs):
         self.calls += 1
         self.system_prompts.append(kwargs["system_prompt"])
+        self.user_prompts.append(kwargs["user_prompt"])
         return next(self.responses)
 
 
@@ -128,3 +130,34 @@ async def test_llm_gateway_returns_decision_for_requested_expert():
 
     assert result.expert_id == expert.id
     assert result.public_focus
+
+
+@pytest.mark.asyncio
+async def test_expert_decision_context_is_append_only_for_provider_cache_hits():
+    valid = {
+        "action": "speak",
+        "urgency": 70,
+        "publicFocus": "核对新增证据",
+        "targetMessageId": None,
+    }
+    provider = SequenceProvider([valid, valid])
+    gateway = LLMAgentGateway(ValidatedLLMClient(provider))
+    expert = AgentProfile("expert-1", "林澈", "研究员", "关注公平", "#B49CFF")
+    state = PanelRunState(
+        topic_id="topic-1",
+        session_id="session-1",
+        title="测试议题",
+        host=AgentProfile("host-1", "周岚", "主持人", "中立", "#69E4CE", "host"),
+        experts=[expert],
+        status="admitted",
+        max_turns=18,
+        transcript=[TranscriptEntry("session-1", 1, "host-1", "host", "开场问题。")],
+    )
+
+    await gateway.expert_decision(expert=expert, state=state)
+    state.transcript.append(
+        TranscriptEntry("session-1", 2, "expert-2", "expert", "新增观点。")
+    )
+    await gateway.expert_decision(expert=expert, state=state)
+
+    assert provider.user_prompts[1].startswith(provider.user_prompts[0] + "\n")

@@ -66,6 +66,21 @@ class PanelGenerationResult(ApiModel):
     experts: list[GeneratedParticipant] = Field(min_length=2, max_length=8)
 
 
+class PanelMemberUpdate(ApiModel):
+    id: str
+    name: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=160)
+    stance: str = Field(min_length=1, max_length=1000)
+    public_profile: str = Field(min_length=1, max_length=1000)
+    color: str = Field(pattern=r"^#[0-9A-Fa-f]{6}$")
+
+
+class PanelUpdateRequest(ApiModel):
+    generation: int = Field(ge=1)
+    host: PanelMemberUpdate
+    experts: list[PanelMemberUpdate] = Field(min_length=2, max_length=8)
+
+
 class ExpertRead(ApiModel):
     id: str
     topic_id: str

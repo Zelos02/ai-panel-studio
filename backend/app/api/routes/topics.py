@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,7 @@ from ...database import get_db
 from ...schemas import (
     PanelAdmitRequest,
     PanelRead,
+    PanelUpdateRequest,
     SessionCreate,
     SessionList,
     SessionRead,
@@ -43,6 +44,12 @@ def get_topic(topic_id: str, db: Annotated[Session, Depends(get_db)]) -> TopicRe
     return TopicRead.model_validate(topic)
 
 
+@router.delete("/{topic_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_topic(topic_id: str, db: Annotated[Session, Depends(get_db)]) -> Response:
+    TopicService(db).delete(topic_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.post("/{topic_id}/panel:generate", response_model=PanelRead)
 async def generate_panel(
     topic_id: str,
@@ -69,6 +76,16 @@ def admit_panel(
     db: Annotated[Session, Depends(get_db)],
 ) -> PanelRead:
     return PanelService(db, request.app.state.llm_provider).admit(topic_id, data.generation)
+
+
+@router.put("/{topic_id}/panel", response_model=PanelRead)
+def update_panel(
+    topic_id: str,
+    data: PanelUpdateRequest,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> PanelRead:
+    return PanelService(db, request.app.state.llm_provider).update(topic_id, data)
 
 
 @router.post(

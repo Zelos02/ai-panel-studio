@@ -1,13 +1,13 @@
 import type { CSSProperties } from "react";
 import type { ExpertPreview, TranscriptPreview } from "../types";
 
-export function TranscriptPanel({ experts, transcript, isRunning = false }: { experts: ExpertPreview[]; transcript: TranscriptPreview[]; isRunning?: boolean }) {
+export function TranscriptPanel({ experts, transcript, isRunning = false, isCompleted = false }: { experts: ExpertPreview[]; transcript: TranscriptPreview[]; isRunning?: boolean; isCompleted?: boolean }) {
   const people = new Map(experts.map((expert) => [expert.id, expert]));
   return (
     <section className="studio-panel transcript-panel" aria-labelledby="transcript-heading">
       <div className="panel-heading transcript-heading">
         <div><span className="section-kicker">LIVE TRANSCRIPT</span><h2 id="transcript-heading">观点现场</h2></div>
-        <div className="live-indicator" aria-label="直播进行中"><span />LIVE</div>
+        <div className={`live-indicator ${isRunning ? "" : "live-indicator--archive"}`} aria-label={isRunning ? "直播进行中" : "讨论记录"}><span />{isRunning ? "LIVE" : isCompleted ? "ARCHIVE" : "READY"}</div>
       </div>
       <div className="transcript-scroll" aria-live="polite">
         {transcript.length === 0 && (

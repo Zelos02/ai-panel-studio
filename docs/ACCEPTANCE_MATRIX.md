@@ -22,6 +22,10 @@
 | API Key 后端隔离 | Settings、Provider Factory | 默认 Fake 测试；仓库 `sk-...` 凭据扫描无结果 | 通过 |
 | 响应式演播厅 | 三栏/平板/移动 CSS | 前端构建、390 × 844 Playwright 视口测试 | 通过 |
 | 历史恢复 | sessions/transcript/branches/summary API | Playwright 完成后重新进入 | 通过 |
+| 讨论删除 | Topic ORM cascade、运行态保护、双确认 UI | 级联删除测试、运行态 409、Playwright 管理场景 | 通过 |
+| 未开场阵容编辑 | generation、成员 ID/人数/状态校验 | API 编辑/锁定测试、组件与 Playwright 管理场景 | 通过 |
+| 长复盘可读性 | 固定比例中心网格、总结独立滚动 | Playwright 高度与 overflow 断言 | 通过 |
+| Provider 缓存前缀 | JSONL 追加上下文、24 条默认窗口、连接复用 | 第二轮 Prompt 以前一轮为完整前缀的测试 | 通过 |
 
 ## E2E 场景
 

@@ -69,7 +69,9 @@
 | GET `/topics` | 按更新时间倒序列出话题 | 200 |
 | POST `/topics` | 创建话题 | 201, 422 |
 | GET `/topics/{topicId}` | 话题详情及当前阵容/Session 摘要 | 200, 404 |
+| DELETE `/topics/{topicId}` | 删除非运行中的话题及全部关联记录 | 204, 404, 409 |
 | POST `/topics/{topicId}/panel:generate` | 生成或重新生成未确认阵容 | 200, 409, 422, 502, 504 |
+| PUT `/topics/{topicId}/panel` | 编辑尚未开场的现有阵容 | 200, 409, 422 |
 | PUT `/topics/{topicId}/panel:admit` | 原子确认当前阵容 | 200, 409 |
 | GET `/topics/{topicId}/experts` | 获取主持人与专家 | 200, 404 |
 | POST `/topics/{topicId}/sessions` | 基于已确认阵容创建 Session | 201, 409 |
@@ -115,6 +117,14 @@
 ### PUT `/topics/{topicId}/panel:admit`
 
 请求包含客户端看到的 `generation`，防止确认已被重新生成替换的旧阵容。成功后所有成员 `admitted=true`，Topic 进入 ready。
+
+### PUT `/topics/{topicId}/panel`
+
+请求包含当前 `generation`、主持人以及固定数量的专家。允许修改 `name`、`title`、`stance`、`publicProfile` 和 `color`，但成员 ID、角色与人数不能改变。所有关联 Session 都尚未开始时才可编辑；成功后 generation 递增。已开始或完成的历史阵容返回 `PANEL_EDIT_LOCKED`。
+
+### DELETE `/topics/{topicId}`
+
+删除话题，并级联删除阵容、场次、Transcript、知识分岔、内部事件和总结。运行中、暂停中或正在收尾的场次返回 `TOPIC_DELETE_LOCKED`；前端必须进行二次确认。
 
 ### POST `/topics/{topicId}/sessions`
 
@@ -167,6 +177,9 @@ data: {"eventId":42,"topicId":"...","sessionId":"...","timestamp":"...","payload
 | `RESOURCE_NOT_FOUND` | 404 | false |
 | `PANEL_ALREADY_ADMITTED` | 409 | false |
 | `PANEL_INVALID_STATE` | 409 | false |
+| `PANEL_EDIT_LOCKED` | 409 | false |
+| `PANEL_GENERATION_STALE` | 409 | false |
+| `TOPIC_DELETE_LOCKED` | 409 | false |
 | `SESSION_ALREADY_RUNNING` | 409 | false |
 | `LLM_TIMEOUT` | 504 | true |
 | `LLM_INVALID_OUTPUT` | 502 | true |

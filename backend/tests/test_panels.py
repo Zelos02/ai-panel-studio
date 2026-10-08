@@ -65,3 +65,70 @@ def test_admitted_panel_cannot_be_regenerated_and_session_is_unique(client):
     duplicate = client.post(f"/api/v1/topics/{topic['id']}/sessions", json={})
     assert duplicate.status_code == 409
     assert duplicate.json()["error"]["code"] == "SESSION_ALREADY_ACTIVE"
+
+
+def panel_update_payload(panel, *, host_name="新主持人"):
+    def member_payload(member):
+        return {
+            "id": member["id"],
+            "name": host_name if member["kind"] == "host" else member["name"],
+            "title": member["title"],
+            "stance": member["stance"],
+            "publicProfile": member["publicProfile"],
+            "color": member["color"],
+        }
+
+    return {
+        "generation": panel["generation"],
+        "host": member_payload(panel["host"]),
+        "experts": [member_payload(item) for item in panel["experts"]],
+    }
+
+
+def test_edit_panel_before_session_starts_and_preserve_member_ids(client):
+    topic = create_topic(client, expert_count=2)
+    panel = client.post(f"/api/v1/topics/{topic['id']}/panel:generate", json={}).json()
+    admitted = client.put(
+        f"/api/v1/topics/{topic['id']}/panel:admit",
+        json={"generation": panel["generation"]},
+    ).json()
+    client.post(f"/api/v1/topics/{topic['id']}/sessions", json={})
+
+    updated = client.put(
+        f"/api/v1/topics/{topic['id']}/panel",
+        json=panel_update_payload(admitted),
+    )
+
+    assert updated.status_code == 200
+    body = updated.json()
+    assert body["generation"] == admitted["generation"] + 1
+    assert body["host"]["name"] == "新主持人"
+    assert body["host"]["id"] == admitted["host"]["id"]
+    assert [item["id"] for item in body["experts"]] == [
+        item["id"] for item in admitted["experts"]
+    ]
+
+
+def test_edit_panel_is_locked_after_session_has_started(client):
+    topic = create_topic(client, expert_count=2)
+    panel = client.post(f"/api/v1/topics/{topic['id']}/panel:generate", json={}).json()
+    admitted = client.put(
+        f"/api/v1/topics/{topic['id']}/panel:admit",
+        json={"generation": panel["generation"]},
+    ).json()
+    panel_session = client.post(f"/api/v1/topics/{topic['id']}/sessions", json={}).json()
+
+    with client.app.state.session_factory() as db:
+        from app.models import PanelSession
+
+        stored = db.get(PanelSession, panel_session["id"])
+        stored.status = "running"
+        db.commit()
+
+    updated = client.put(
+        f"/api/v1/topics/{topic['id']}/panel",
+        json=panel_update_payload(admitted),
+    )
+
+    assert updated.status_code == 409
+    assert updated.json()["error"]["code"] == "PANEL_EDIT_LOCKED"

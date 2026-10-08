@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 
 import { BranchPanel } from "./components/BranchPanel";
 import { Brand } from "./components/Brand";
+import { DiscussionManager } from "./components/DiscussionManager";
 import { ExpertRail } from "./components/ExpertRail";
 import { NewTopicPanel } from "./components/NewTopicPanel";
 import { PanelAdmission } from "./components/PanelAdmission";
@@ -45,10 +46,16 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [managerTopic, setManagerTopic] = useState<TopicResource | null>(null);
+  const [managerPanel, setManagerPanel] = useState<PanelResource | null>(null);
+  const [managerSessions, setManagerSessions] = useState<SessionResource[]>([]);
+  const [managerLoading, setManagerLoading] = useState(false);
+  const [managerBusy, setManagerBusy] = useState(false);
+  const [managerError, setManagerError] = useState<string | null>(null);
 
   useEffect(() => {
     void loadTopics();
-    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") setComposerOpen(false); }
+    function closeOnEscape(event: KeyboardEvent) { if (event.key === "Escape") { setComposerOpen(false); setManagerTopic(null); } }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
@@ -93,6 +100,55 @@ export default function App() {
     const panel = await api.generatePanel(topic.id);
     setTopics((current) => [topic, ...current]);
     setActiveTopic(topic); setActivePanel(panel); setComposerOpen(false); setView("admission");
+  }
+
+  async function openManager(preview: TopicPreview) {
+    const topic = topics.find((item) => item.id === preview.id);
+    if (!topic) return;
+    setManagerTopic(topic); setManagerPanel(null); setManagerSessions([]); setManagerError(null); setManagerLoading(true);
+    try {
+      const [panel, sessions] = await Promise.all([
+        api.getPanel(topic.id).catch((reason) => {
+          if (reason instanceof ApiError && reason.status === 404) return null;
+          throw reason;
+        }),
+        api.listSessions(topic.id),
+      ]);
+      setManagerPanel(panel); setManagerSessions(sessions);
+    } catch (reason) {
+      setManagerError(reason instanceof Error ? reason.message : "无法读取讨论配置。");
+    } finally {
+      setManagerLoading(false);
+    }
+  }
+
+  async function saveManagedPanel(panel: PanelResource) {
+    if (!managerTopic) return;
+    setManagerBusy(true); setManagerError(null);
+    try {
+      const updated = await api.updatePanel(managerTopic.id, panel);
+      setManagerPanel(updated);
+      setActivePanel((current) => current?.topicId === updated.topicId ? updated : current);
+      await loadTopics();
+    } catch (reason) {
+      setManagerError(reason instanceof Error ? reason.message : "无法保存阵容修改。");
+    } finally {
+      setManagerBusy(false);
+    }
+  }
+
+  async function deleteManagedTopic() {
+    if (!managerTopic) return;
+    setManagerBusy(true); setManagerError(null);
+    try {
+      await api.deleteTopic(managerTopic.id);
+      setTopics((current) => current.filter((item) => item.id !== managerTopic.id));
+      setManagerTopic(null); setManagerPanel(null); setManagerSessions([]);
+    } catch (reason) {
+      setManagerError(reason instanceof Error ? reason.message : "无法删除这场讨论。");
+    } finally {
+      setManagerBusy(false);
+    }
   }
 
   async function openTopic(preview: TopicPreview) {
@@ -172,16 +228,17 @@ export default function App() {
 
   if (view === "studio" && activeTopic && activePanel && activeSession) {
     const running = activeSession.status === "running";
+    const completed = activeSession.status === "completed";
     const progress = Math.min(100, Math.round(activeSession.turnCount / activeSession.maxTurns * 100));
     return (
       <div className="studio-shell">
         <header className="topbar">
           <button className="brand-button" type="button" onClick={leaveStudio}><Brand /></button>
           <div className="topic-titlebar"><span>{running ? "讨论进行中" : activeSession.status === "completed" ? "讨论已结束" : "等待开场"} · {activeSession.status}</span><strong>{activeTopic.title}</strong></div>
-          <div className="topbar-actions"><span className={`connection-pill connection-pill--${connectionState}`}><i /> {connectionLabel(connectionState)}</span>{activeSession.status === "admitted" && <button className="primary-button" type="button" disabled={busy} onClick={() => void startDiscussion()}>{busy ? "正在启动…" : "启动讨论"}</button>}{running && <button className="danger-button" type="button" disabled={busy} onClick={() => void stopDiscussion()}>结束并总结</button>}</div>
+          <div className="topbar-actions"><span className={`connection-pill connection-pill--${completed ? "completed" : connectionState}`}><i /> {completed ? "记录已同步" : connectionLabel(connectionState)}</span>{activeSession.status === "admitted" && <button className="primary-button" type="button" disabled={busy} onClick={() => void startDiscussion()}>{busy ? "正在启动…" : "启动讨论"}</button>}{running && <button className="danger-button" type="button" disabled={busy} onClick={() => void stopDiscussion()}>结束并总结</button>}</div>
         </header>
         {pageError && <div className="studio-error error-banner" role="alert">{pageError}</div>}
-        <main className="studio-grid"><ExpertRail experts={liveExperts} /><div className="studio-center"><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} />{summaryText && <SummaryPanel text={summaryText} />}</div><BranchPanel branches={liveBranches} /></main>
+        <main className="studio-grid"><ExpertRail experts={liveExperts} /><div className={`studio-center ${summaryText ? "studio-center--with-summary" : ""}`}><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} isCompleted={completed} />{summaryText && <SummaryPanel text={summaryText} />}</div><BranchPanel branches={liveBranches} /></main>
         <footer className="studio-footer"><span>ROUND {String(activeSession.turnCount).padStart(2, "0")} / {activeSession.maxTurns}</span><div className="round-progress"><i style={{ width: `${progress}%` }} /></div><span>{running ? "专家正在自主判断发言时机" : activeSession.status === "completed" ? "讨论完成" : "等待主持人开场"}</span></footer>
       </div>
     );
@@ -193,11 +250,12 @@ export default function App() {
       <header className="home-header"><Brand /><nav aria-label="主导航"><a href="#sessions">讨论现场</a><a href="#method">工作方式</a></nav><button className="primary-button" type="button" onClick={() => setComposerOpen(true)}><span aria-hidden="true">＋</span> 发起新讨论</button></header>
       <main>
         <section className="hero" aria-labelledby="hero-title"><div className="hero-copy"><span className="hero-badge"><i /> AI 圆桌演播厅 · 本地 MVP</span><h1 id="hero-title">别只要答案。<em>看见观点如何形成。</em></h1><p>邀请一组立场鲜明的虚拟专家，在主持人的追问中自主举手、补充与反驳。每一次分歧，都成为下一条知识路径。</p><div className="hero-actions"><button className="primary-button primary-button--large" type="button" onClick={() => setComposerOpen(true)}>召集一场圆桌 <span aria-hidden="true">→</span></button><a className="ghost-button" href="#sessions"><span className="play-icon" aria-hidden="true">↓</span> 查看讨论记录</a></div></div><div className="hero-orbit" aria-label="四位虚拟专家围绕议题协作的示意图"><div className="orbit-glow" /><div className="orbit-center"><span>LIVE</span><strong>观点正在<br />交汇</strong><small>4 EXPERTS</small></div>{heroExperts.slice(1).map((expert, index) => <div className={`orbit-person orbit-person--${index + 1}`} key={expert.id} style={{ "--expert-color": expert.color } as CSSProperties}><span>{expert.initials}</span><small>{expert.name}</small></div>)}<svg className="orbit-lines" viewBox="0 0 520 420" aria-hidden="true"><path d="M260 210 L105 90 M260 210 L415 90 M260 210 L105 330 M260 210 L415 330" /></svg></div></section>
-        <section className="session-section" id="sessions" aria-labelledby="session-heading"><div className="section-heading-row"><div><span className="section-kicker">RECENT SESSIONS</span><h2 id="session-heading">继续你的讨论</h2></div><span className="session-total">{String(topics.length).padStart(2, "0")} 场记录</span></div>{pageError && <div className="error-banner" role="alert">{pageError} <button className="text-button" type="button" onClick={() => void loadTopics()}>重试</button></div>}{loading ? <div className="loading-state">正在读取讨论记录…</div> : <div className="topic-grid">{previews.map((topic) => <TopicCard key={topic.id} topic={topic} onOpen={(item) => void openTopic(item)} />)}<button className="new-topic-card" type="button" onClick={() => setComposerOpen(true)}><span aria-hidden="true">＋</span><strong>开启一个新议题</strong><small>{busy ? "正在准备…" : "输入主题，系统会召集不同视角的专家"}</small></button></div>}</section>
+        <section className="session-section" id="sessions" aria-labelledby="session-heading"><div className="section-heading-row"><div><span className="section-kicker">RECENT SESSIONS</span><h2 id="session-heading">继续你的讨论</h2></div><span className="session-total">{String(topics.length).padStart(2, "0")} 场记录</span></div>{pageError && <div className="error-banner" role="alert">{pageError} <button className="text-button" type="button" onClick={() => void loadTopics()}>重试</button></div>}{loading ? <div className="loading-state">正在读取讨论记录…</div> : <div className="topic-grid">{previews.map((topic) => <TopicCard key={topic.id} topic={topic} onOpen={(item) => void openTopic(item)} onManage={(item) => void openManager(item)} />)}<button className="new-topic-card" type="button" onClick={() => setComposerOpen(true)}><span aria-hidden="true">＋</span><strong>开启一个新议题</strong><small>{busy ? "正在准备…" : "输入主题，系统会召集不同视角的专家"}</small></button></div>}</section>
         <section className="method-strip" id="method" aria-label="产品工作方式"><span><b>01</b> 生成多元阵容</span><i>→</i><span><b>02</b> 自主观点交锋</span><i>→</i><span><b>03</b> 捕捉知识分岔</span><i>→</i><span><b>04</b> 沉淀决策摘要</span></section>
       </main>
       <footer className="home-footer"><span>AI PANEL STUDIO / 2026</span><span>让复杂问题拥有不止一个声音</span></footer>
       {composerOpen && <NewTopicPanel onClose={() => setComposerOpen(false)} onSubmit={createTopic} />}
+      {managerTopic && <DiscussionManager topic={managerTopic} panel={managerPanel} sessions={managerSessions} loading={managerLoading} busy={managerBusy} error={managerError} onClose={() => setManagerTopic(null)} onSave={(panel) => void saveManagedPanel(panel)} onDelete={() => void deleteManagedTopic()} />}
     </div>
   );
 }

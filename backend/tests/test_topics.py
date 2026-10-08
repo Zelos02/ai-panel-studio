@@ -42,3 +42,44 @@ def test_missing_topic_returns_stable_error(client):
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+
+
+def test_delete_topic_removes_its_panel_and_sessions(client):
+    topic = client.post(
+        "/api/v1/topics", json={"title": "待删除讨论", "requestedExpertCount": 2}
+    ).json()
+    panel = client.post(f"/api/v1/topics/{topic['id']}/panel:generate", json={}).json()
+    client.put(
+        f"/api/v1/topics/{topic['id']}/panel:admit",
+        json={"generation": panel["generation"]},
+    )
+    panel_session = client.post(f"/api/v1/topics/{topic['id']}/sessions", json={}).json()
+
+    deleted = client.delete(f"/api/v1/topics/{topic['id']}")
+
+    assert deleted.status_code == 204
+    assert client.get(f"/api/v1/topics/{topic['id']}").status_code == 404
+    assert client.get(f"/api/v1/sessions/{panel_session['id']}").status_code == 404
+
+
+def test_running_topic_cannot_be_deleted(client):
+    topic = client.post(
+        "/api/v1/topics", json={"title": "运行中讨论", "requestedExpertCount": 2}
+    ).json()
+    panel = client.post(f"/api/v1/topics/{topic['id']}/panel:generate", json={}).json()
+    client.put(
+        f"/api/v1/topics/{topic['id']}/panel:admit",
+        json={"generation": panel["generation"]},
+    )
+    panel_session = client.post(f"/api/v1/topics/{topic['id']}/sessions", json={}).json()
+    with client.app.state.session_factory() as db:
+        from app.models import PanelSession
+
+        stored = db.get(PanelSession, panel_session["id"])
+        stored.status = "running"
+        db.commit()
+
+    deleted = client.delete(f"/api/v1/topics/{topic['id']}")
+
+    assert deleted.status_code == 409
+    assert deleted.json()["error"]["code"] == "TOPIC_DELETE_LOCKED"

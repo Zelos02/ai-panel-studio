@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import logging
 from contextlib import asynccontextmanager
 from uuid import uuid4
@@ -30,6 +31,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        provider_close = getattr(application.state.llm_provider, "close", None)
+        if provider_close is not None:
+            close_result = provider_close()
+            if inspect.isawaitable(close_result):
+                await close_result
         engine.dispose()
 
     app = FastAPI(title="AI Panel Studio API", version="0.1.0", lifespan=lifespan)

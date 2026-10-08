@@ -5,6 +5,7 @@
 ## 已实现能力
 
 - 多话题创建、列表与历史恢复。
+- 讨论管理：双确认删除；未开场阵容可编辑且历史场次锁定。
 - 默认 4 位专家，可选 2～8 位。
 - 主持人/专家阵容生成、generation 版本保护和确认入场。
 - 主持人开场/收尾，专家并行判断发言意图，非固定轮询调度。
@@ -13,6 +14,7 @@
 - 独立专家状态窗口与公开关注点摘要，不请求或展示隐藏思维链。
 - 讨论中实时知识分岔、会话内去重和来源发言定位。
 - 讨论完成后的自然语言复盘；原始 JSON 不进入 UI。
+- Transcript 与长总结独立滚动，完成态明确显示为归档记录。
 - deterministic Fake Provider：无 API Key、无外网也能演示和测试。
 - 5 组可重复导入的高质量预设话题与嘉宾阵容。
 
@@ -68,7 +70,7 @@ npx playwright install chromium
 powershell -ExecutionPolicy Bypass -File .\scripts\seed.ps1
 ```
 
-Seed 可重复执行：已有同名预设话题会跳过。默认数据库位于 `backend/data/panel_studio.db`，不会提交到 Git。
+Seed 可重复执行：已有同名预设话题会跳过。五组话题来自实际完成并人工确认质量的医疗责任、未成年人短视频、自动驾驶出租车、AI 独立开发者与企业 AI 用工圆桌；每组包含对应主持人和四位立场互补的专家。默认数据库位于 `backend/data/panel_studio.db`，不会提交到 Git。
 
 ## 本地运行
 
@@ -129,12 +131,15 @@ npm run test:e2e
 ```
 
 E2E 会自动启动前后端、使用 Fake Provider 和 `.tmp` SQLite，不调用真实模型。
+E2E 默认使用 `18000` 和 `15173` 两个独立端口，因此日常开发服务器仍在运行时也可以执行。
 
 ## 主要 API
 
 - `GET/POST /api/v1/topics`
 - `POST /api/v1/topics/{id}/panel:generate`
+- `PUT /api/v1/topics/{id}/panel`
 - `PUT /api/v1/topics/{id}/panel:admit`
+- `DELETE /api/v1/topics/{id}`
 - `GET /api/v1/topics/{id}/experts`
 - `POST/GET /api/v1/topics/{id}/sessions`
 - `POST /api/v1/sessions/{id}:start`
@@ -147,6 +152,12 @@ E2E 会自动启动前后端、使用 Fake Provider 和 `.tmp` SQLite，不调�
 ## UI 设计方向
 
 界面采用深色“数据演播厅”风格：桌面端为专家状态、Transcript、知识分岔三栏，各区域独立滚动；平板减少侧栏；手机聚焦 Transcript，并将总结浮层化。专家专属颜色在阵容卡、状态卡与发言记录之间保持一致。
+
+## DeepSeek 缓存与调用成本
+
+DeepSeek 的上下文缓存自动工作，关键是后续请求必须与既有请求拥有从首 token 开始完全一致的前缀。项目将逐轮 Transcript 编码为只追加的 JSONL，并把动态内容放在稳定身份信息之后；默认 18 轮讨论不会因滑窗删除旧消息而破坏前缀。真实 Provider 复用一个 HTTP Client，并在后端输出 `cache_hit_tokens`、`cache_miss_tokens` 和输出 Token，不记录 Prompt 原文或 API Key。
+
+缓存命中率应按 `命中输入 /（命中输入 + 未命中输入）` 计算，不能把输出 Token 放进分母。缓存是尽力而为，首次请求和不同专家身份仍会产生未命中。
 
 ## 测试账号
 

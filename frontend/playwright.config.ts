@@ -22,6 +22,10 @@ const pythonCommand = process.env.E2E_PYTHON ?? defaultPython;
 const pythonSearchPaths = existsSync(pythonPackages)
   ? [pythonPackages, backendDir]
   : [backendDir];
+const backendPort = Number(process.env.E2E_BACKEND_PORT ?? "18000");
+const frontendPort = Number(process.env.E2E_FRONTEND_PORT ?? "15173");
+const backendUrl = `http://127.0.0.1:${backendPort}`;
+const frontendUrl = `http://127.0.0.1:${frontendPort}`;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -31,7 +35,7 @@ export default defineConfig({
   expect: { timeout: 12_000 },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: frontendUrl,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
@@ -39,7 +43,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
-      command: `${pythonCommand} -m uvicorn app.main:app --host 127.0.0.1 --port 8000`,
+      command: `${pythonCommand} -m uvicorn app.main:app --host 127.0.0.1 --port ${backendPort}`,
       cwd: backendDir,
       env: {
         ...process.env,
@@ -47,16 +51,20 @@ export default defineConfig({
         APP_ENV: "test",
         DATABASE_URL: `sqlite:///${databasePath}`,
         LLM_PROVIDER: "fake",
-        FRONTEND_ORIGIN: "http://127.0.0.1:5173",
+        FRONTEND_ORIGIN: frontendUrl,
       },
-      url: "http://127.0.0.1:8000/api/v1/health",
+      url: `${backendUrl}/api/v1/health`,
       reuseExistingServer: false,
       timeout: 30_000,
     },
     {
-      command: "npm run dev -- --host 127.0.0.1",
+      command: `npm run dev -- --host 127.0.0.1 --port ${frontendPort}`,
       cwd: frontendDir,
-      url: "http://127.0.0.1:5173",
+      env: {
+        ...process.env,
+        VITE_API_PROXY_TARGET: backendUrl,
+      },
+      url: frontendUrl,
       reuseExistingServer: false,
       timeout: 30_000,
     },

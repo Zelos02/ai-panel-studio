@@ -1,4 +1,4 @@
-import type { BranchResource, NewTopicInput, PanelResource, SessionResource, SummaryResource, TopicResource, TranscriptResource } from "../types";
+import type { BranchResource, NewTopicInput, PanelResource, PanelUpdateInput, SessionResource, SummaryResource, TopicResource, TranscriptResource } from "../types";
 
 interface ApiErrorPayload {
   error?: {
@@ -35,7 +35,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       response.status,
     );
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+function editableMember(member: PanelResource["host"]) {
+  return {
+    id: member.id,
+    name: member.name,
+    title: member.title,
+    stance: member.stance,
+    publicProfile: member.publicProfile,
+    color: member.color,
+  };
 }
 
 export const api = {
@@ -51,6 +63,19 @@ export const api = {
   },
   getPanel(topicId: string): Promise<PanelResource> {
     return request(`/topics/${topicId}/experts`);
+  },
+  updatePanel(topicId: string, panel: PanelUpdateInput): Promise<PanelResource> {
+    return request(`/topics/${topicId}/panel`, {
+      method: "PUT",
+      body: JSON.stringify({
+        generation: panel.generation,
+        host: editableMember(panel.host),
+        experts: panel.experts.map(editableMember),
+      }),
+    });
+  },
+  deleteTopic(topicId: string): Promise<void> {
+    return request(`/topics/${topicId}`, { method: "DELETE" });
   },
   admitPanel(topicId: string, generation: number): Promise<PanelResource> {
     return request(`/topics/${topicId}/panel:admit`, {

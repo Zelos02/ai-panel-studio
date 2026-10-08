@@ -6,8 +6,8 @@ from .prompts import EXPERT_UTTERANCE_SYSTEM, HOST_UTTERANCE_SYSTEM, TURN_DECISI
 from .validated import ValidatedLLMClient
 
 
-def _public_context(state: PanelRunState, limit: int = 16) -> str:
-    payload = [
+def _public_context(state: PanelRunState, limit: int = 24) -> str:
+    rows = (
         {
             "sequence": message.sequence,
             "speakerId": message.speaker_id,
@@ -15,8 +15,10 @@ def _public_context(state: PanelRunState, limit: int = 16) -> str:
             "content": message.content,
         }
         for message in state.transcript[-limit:]
-    ]
-    return json.dumps(payload, ensure_ascii=False)
+    )
+    return "\n".join(
+        json.dumps(row, ensure_ascii=False, separators=(",", ":")) for row in rows
+    )
 
 
 class LLMAgentGateway:
@@ -42,7 +44,7 @@ class LLMAgentGateway:
             system_prompt=TURN_DECISION_SYSTEM,
             user_prompt=(
                 f"话题：{state.title}\n专家：{expert.name}\n职业：{expert.title}\n"
-                f"立场：{expert.stance}\n公开 Transcript：{_public_context(state)}"
+                f"立场：{expert.stance}\n公开 Transcript（JSONL，按时间追加）：\n{_public_context(state)}"
             ),
         )
         return TurnDecision(
@@ -67,7 +69,7 @@ class LLMAgentGateway:
                 f"话题：{state.title}\n专家：{expert.name}\n职业：{expert.title}\n"
                 f"立场：{expert.stance}\n行动：{decision.action.value}\n"
                 f"公开关注点：{decision.public_focus}\n"
-                f"公开 Transcript：{_public_context(state)}"
+                f"公开 Transcript（JSONL，按时间追加）：\n{_public_context(state)}"
             ),
         )
         return result.content

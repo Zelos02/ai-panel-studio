@@ -199,4 +199,4 @@ Fake Provider 直接按代码构造正确字典，掩盖了 OpenAI-compatible Pr
 - Seed 精确替换为用户确认的五组话题与 25 位对应成员。
 - 决策 Prompt 的第二轮以第一轮完整内容加换行开头，满足 Provider 缓存前缀规则；E2E 改用独立端口。
 - 最终一键回归：后端 31 项、前端组件 4 项、Playwright 4 项全部通过，生产构建成功。
-- 对应提交：本记录随标题为 `feat: add discussion management and harden completed sessions` 的提交写入。
+- 对应提交：`2878e04 feat: add discussion management and harden completed sessions`

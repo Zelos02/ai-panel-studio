@@ -33,3 +33,6 @@ logs/
 .DS_Store
 Thumbs.db
 *.log
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts

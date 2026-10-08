@@ -1,4 +1,4 @@
-import type { NewTopicInput, PanelResource, SessionResource, TopicResource } from "../types";
+import type { BranchResource, NewTopicInput, PanelResource, SessionResource, SummaryResource, TopicResource, TranscriptResource } from "../types";
 
 interface ApiErrorPayload {
   error?: {
@@ -66,5 +66,23 @@ export const api = {
   },
   startSession(sessionId: string): Promise<SessionResource> {
     return request(`/sessions/${sessionId}:start`, { method: "POST", body: "{}" });
+  },
+  stopSession(sessionId: string): Promise<SessionResource> {
+    return request(`/sessions/${sessionId}:stop`, { method: "POST", body: "{}" });
+  },
+  async listSessions(topicId: string): Promise<SessionResource[]> {
+    const response = await request<{ items: SessionResource[] }>(`/topics/${topicId}/sessions`);
+    return response.items;
+  },
+  async getTranscript(sessionId: string): Promise<TranscriptResource[]> {
+    const response = await request<{ items: TranscriptResource[] }>(`/sessions/${sessionId}/transcript`);
+    return response.items;
+  },
+  async getBranches(sessionId: string): Promise<BranchResource[]> {
+    const response = await request<{ items: BranchResource[] }>(`/sessions/${sessionId}/branches`);
+    return response.items;
+  },
+  getSummary(sessionId: string): Promise<SummaryResource> {
+    return request(`/sessions/${sessionId}/summary`);
   },
 };

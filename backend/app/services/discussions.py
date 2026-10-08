@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -9,8 +11,18 @@ from sqlalchemy.orm import Session, sessionmaker
 from ..domain import ExpertKind, SessionStatus, TopicStatus
 from ..errors import AppError
 from ..events import EventHub, EventStore
-from ..llm import LLMAgentGateway, LLMProvider, ValidatedLLMClient
-from ..models import Expert, ExpertStatus, PanelSession, Topic, TranscriptMessage
+from ..llm import LLMAgentGateway, LLMContractError, LLMProvider, ValidatedLLMClient
+from ..llm.contracts import BranchSuggestion, SessionSummaryResult
+from ..llm.prompts import BRANCH_SYSTEM, SUMMARY_SYSTEM
+from ..models import (
+    Expert,
+    ExpertStatus,
+    KnowledgeBranch,
+    PanelSession,
+    SessionSummary,
+    Topic,
+    TranscriptMessage,
+)
 from ..orchestration import (
     AgentProfile,
     OrchestrationEvent,
@@ -34,7 +46,7 @@ class PersistentEventSink:
         self.hub = hub
         self.sentence_policy = SentencePolicy()
 
-    async def __call__(self, event: OrchestrationEvent) -> None:
+    async def __call__(self, event: OrchestrationEvent) -> dict:
         with self.session_factory() as db:
             panel_session = db.get(PanelSession, event.session_id)
             if panel_session is None:
@@ -100,9 +112,154 @@ class PersistentEventSink:
                 if payload["message"]["speaker"]["role"] == ExpertKind.EXPERT.value:
                     panel_session.turn_count += 1
 
+            elif event.event_type == "branch.created":
+                branch_data = payload["branch"]
+                branch = KnowledgeBranch(
+                    session_id=event.session_id,
+                    source_message_id=branch_data["sourceMessageId"],
+                    branch_type=branch_data["branchType"],
+                    title=branch_data["title"],
+                    summary=branch_data["summary"],
+                    fingerprint=branch_data["fingerprint"],
+                )
+                db.add(branch)
+                db.flush()
+                payload = {
+                    "branch": {
+                        "id": branch.id,
+                        "branchType": branch.branch_type,
+                        "title": branch.title,
+                        "summary": branch.summary,
+                        "sourceMessageId": branch.source_message_id,
+                    }
+                }
+
+            elif event.event_type == "summary.ready":
+                summary = db.scalar(
+                    select(SessionSummary).where(SessionSummary.session_id == event.session_id)
+                )
+                if summary is None:
+                    summary = SessionSummary(session_id=event.session_id, natural_text="")
+                    db.add(summary)
+                summary.natural_text = str(payload["naturalText"])
+                summary.structured_json = json.dumps(payload["structured"], ensure_ascii=False)
+                payload = {"naturalText": summary.natural_text}
+
             stored = EventStore(db).append(event.session_id, event.event_type, payload)
             db.commit()
         await self.hub.publish(event.session_id, stored)
+        return stored
+
+
+class DiscussionEventPipeline:
+    def __init__(self, *, sink: PersistentEventSink, provider: LLMProvider) -> None:
+        self.sink = sink
+        self.client = ValidatedLLMClient(provider)
+
+    async def __call__(self, event: OrchestrationEvent) -> None:
+        stored = await self.sink(event)
+        if event.event_type == "transcript.append":
+            message = stored["payload"]["message"]
+            if message["speaker"]["role"] == ExpertKind.EXPERT.value:
+                await self._maybe_create_branch(event.session_id, message)
+        elif event.event_type == "session.state" and event.payload.get("status") == "completed":
+            await self._create_summary(event.session_id)
+
+    async def _maybe_create_branch(self, session_id: str, message: dict) -> None:
+        try:
+            suggestion = await self.client.call(
+                BranchSuggestion,
+                system_prompt=BRANCH_SYSTEM,
+                user_prompt=(
+                    f"最新发言 ID：{message['id']}\n"
+                    f"发言人：{message['speaker']['name']}\n"
+                    f"内容：{message['content']}"
+                ),
+            )
+        except LLMContractError as exc:
+            logger.warning(
+                "branch_detection_skipped session_id=%s error_type=%s",
+                session_id,
+                type(exc).__name__,
+            )
+            return
+        if not suggestion.shouldCreate:
+            return
+        fingerprint = hashlib.sha256(
+            f"{suggestion.branchType}:{suggestion.title}".lower().encode("utf-8")
+        ).hexdigest()
+        with self.sink.session_factory() as db:
+            existing = db.scalar(
+                select(KnowledgeBranch.id).where(
+                    KnowledgeBranch.session_id == session_id,
+                    KnowledgeBranch.fingerprint == fingerprint,
+                )
+            )
+        if existing is not None:
+            return
+        await self.sink(
+            OrchestrationEvent(
+                event_type="branch.created",
+                session_id=session_id,
+                payload={
+                    "branch": {
+                        "branchType": suggestion.branchType,
+                        "title": suggestion.title,
+                        "summary": suggestion.summary,
+                        "sourceMessageId": message["id"],
+                        "fingerprint": fingerprint,
+                    }
+                },
+            )
+        )
+
+    async def _create_summary(self, session_id: str) -> None:
+        with self.sink.session_factory() as db:
+            messages = list(
+                db.scalars(
+                    select(TranscriptMessage)
+                    .where(TranscriptMessage.session_id == session_id)
+                    .order_by(TranscriptMessage.sequence)
+                )
+            )
+            public_transcript = [
+                {"role": message.speaker_role, "content": message.content}
+                for message in messages
+            ]
+        try:
+            summary = await self.client.call(
+                SessionSummaryResult,
+                system_prompt=SUMMARY_SYSTEM,
+                user_prompt=json.dumps(public_transcript, ensure_ascii=False),
+            )
+        except LLMContractError as exc:
+            logger.warning(
+                "summary_generation_failed session_id=%s error_type=%s",
+                session_id,
+                type(exc).__name__,
+            )
+            await self.sink(
+                OrchestrationEvent(
+                    event_type="stream.error",
+                    session_id=session_id,
+                    payload={
+                        "code": "SUMMARY_FAILED",
+                        "message": "讨论已完成，但总结生成失败，可以稍后重试。",
+                        "retryable": True,
+                    },
+                )
+            )
+            return
+        await self.sink(
+            OrchestrationEvent(
+                event_type="summary.ready",
+                session_id=session_id,
+                payload={
+                    "naturalText": summary.naturalText,
+                    "structured": summary.model_dump(),
+                },
+            )
+        )
 
 
 class DiscussionRunner:
@@ -112,16 +269,20 @@ class DiscussionRunner:
         session_factory: sessionmaker[Session],
         provider: LLMProvider,
         hub: EventHub,
+        state_registry: dict[str, PanelRunState] | None = None,
     ) -> None:
         self.session_factory = session_factory
         self.provider = provider
         self.hub = hub
+        self.state_registry = state_registry if state_registry is not None else {}
 
     async def run(self, session_id: str) -> None:
         state = self._load_state(session_id)
+        self.state_registry[session_id] = state
         sink = PersistentEventSink(session_factory=self.session_factory, hub=self.hub)
+        pipeline = DiscussionEventPipeline(sink=sink, provider=self.provider)
         gateway = LLMAgentGateway(ValidatedLLMClient(self.provider))
-        orchestrator = PanelOrchestrator(gateway=gateway, event_sink=sink)
+        orchestrator = PanelOrchestrator(gateway=gateway, event_sink=pipeline)
         try:
             await orchestrator.run(state)
         except Exception as exc:
@@ -141,6 +302,8 @@ class DiscussionRunner:
                     },
                 )
             )
+        finally:
+            self.state_registry.pop(session_id, None)
 
     def _load_state(self, session_id: str) -> PanelRunState:
         with self.session_factory() as db:

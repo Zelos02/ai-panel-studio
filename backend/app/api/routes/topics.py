@@ -1,13 +1,17 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
+
+from ...models import PanelSession
 
 from ...database import get_db
 from ...schemas import (
     PanelAdmitRequest,
     PanelRead,
     SessionCreate,
+    SessionList,
     SessionRead,
     TopicCreate,
     TopicList,
@@ -78,3 +82,22 @@ def create_session(
 ) -> SessionRead:
     panel_session = PanelService(db, request.app.state.llm_provider).create_session(topic_id, data)
     return SessionRead.model_validate(panel_session)
+
+
+@router.get("/{topic_id}/sessions", response_model=SessionList)
+def list_topic_sessions(
+    topic_id: str,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+    limit: Annotated[int, Query(ge=1, le=50)] = 20,
+) -> SessionList:
+    PanelService(db, request.app.state.llm_provider)._get_topic(topic_id)
+    rows = list(
+        db.scalars(
+            select(PanelSession)
+            .where(PanelSession.topic_id == topic_id)
+            .order_by(desc(PanelSession.created_at))
+            .limit(limit)
+        )
+    )
+    return SessionList(items=[SessionRead.model_validate(row) for row in rows])

@@ -39,6 +39,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.llm_provider = build_llm_provider(resolved_settings)
     app.state.event_hub = EventHub()
     app.state.discussion_tasks = {}
+    app.state.discussion_states = {}
 
     app.add_middleware(
         CORSMiddleware,

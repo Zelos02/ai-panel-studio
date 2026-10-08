@@ -113,4 +113,20 @@
 
 - 后端 24 个测试通过，覆盖后台启动、事件顺序、公开 Transcript、SSE 帧和跨会话隔离。
 - 前端 3 个测试通过，生产构建成功；SSE Hook 覆盖连接、重复 eventId 过滤和关闭清理。
+- 对应提交：`1607b80 feat: stream panel discussion events with SSE`
+
+## 记录 8：业务闭环——知识分岔、总结与历史恢复
+
+### 实际 Prompt
+
+> 每条专家发言落库后立即调用 BranchSuggestion，按会话内指纹去重并发布 branch.created；讨论完成后调用 SessionSummaryResult，数据库可保存结构化中间结果，但 SSE/API/UI 只暴露 naturalText。重新进入话题时恢复最新场次、Transcript、分岔和总结。
+
+### 意图与过程
+
+将分岔判断放在持久化事件流水线中，保证它引用的是已经存在的 Transcript message ID，也能在总结前实时出现。总结事件发布前主动剥离 structured 数据，前端只接收自然语言；历史场次恢复则并行读取 Transcript 与分岔，并把未生成总结的 404 当作正常运行态处理。
+
+### 结果
+
+- 后端 24 个测试通过；新增断言证明分岔在 completed 事件之前出现、重复建议被去重、summary.ready 只含 naturalText。
+- 前端 3 个测试通过并成功构建；已支持恢复历史讨论、实时分岔、结束控制和自然语言总结面板。
 - 对应提交：待本阶段验收后填写。

@@ -32,7 +32,8 @@ beforeEach(() => {
     if (url.endsWith("/topics") && !init?.method) return jsonResponse({ items: [topic], nextCursor: null });
     if (url.endsWith("/experts")) return jsonResponse(panel);
     if (url.endsWith("/panel:admit")) return jsonResponse({ ...panel, host: { ...host, admitted: true }, experts: experts.map((item) => ({ ...item, admitted: true })) });
-    if (url.endsWith("/sessions")) return jsonResponse({ id: "session-1", topicId: "topic-1", status: "admitted", turnCount: 0, maxTurns: 18, lastEventSequence: 0, createdAt: "2026-10-08T04:10:00Z", startedAt: null, endedAt: null }, 201);
+    if (url.endsWith("/sessions") && !init?.method) return jsonResponse({ items: [] });
+    if (url.endsWith("/sessions") && init?.method === "POST") return jsonResponse({ id: "session-1", topicId: "topic-1", status: "admitted", turnCount: 0, maxTurns: 18, lastEventSequence: 0, createdAt: "2026-10-08T04:10:00Z", startedAt: null, endedAt: null }, 201);
     return jsonResponse({ error: { code: "NOT_FOUND", message: "not found" } }, 404);
   }));
 });

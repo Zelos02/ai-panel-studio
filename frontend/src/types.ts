@@ -97,6 +97,21 @@ export interface TranscriptResource {
   };
 }
 
+export interface BranchResource {
+  id: string;
+  branchType: BranchPreview["type"];
+  title: string;
+  summary: string;
+  sourceMessageId: string;
+  createdAt: string;
+}
+
+export interface SummaryResource {
+  naturalText: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SessionEventType = "session.state" | "expert.status" | "transcript.append" | "branch.created" | "summary.ready" | "stream.error" | "heartbeat";
 
 export interface SessionEvent<T = Record<string, unknown>> {

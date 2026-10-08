@@ -10,9 +10,12 @@ from ...database import get_db
 from ...domain import SessionStatus
 from ...errors import AppError
 from ...events import stream_session_events
-from ...models import Expert, PanelSession, TranscriptMessage
+from ...models import Expert, KnowledgeBranch, PanelSession, SessionSummary, TranscriptMessage
 from ...schemas import (
+    BranchList,
+    BranchRead,
     SessionRead,
+    SummaryRead,
     TranscriptList,
     TranscriptMessageRead,
     TranscriptSpeakerRead,
@@ -51,6 +54,7 @@ async def start_session(
         session_factory=request.app.state.session_factory,
         provider=request.app.state.llm_provider,
         hub=request.app.state.event_hub,
+        state_registry=request.app.state.discussion_states,
     )
     task = asyncio.create_task(runner.run(session_id), name=f"discussion:{session_id}")
     request.app.state.discussion_tasks[session_id] = task
@@ -59,6 +63,24 @@ async def start_session(
         request.app.state.discussion_tasks.pop(session_id, None)
 
     task.add_done_callback(remove_finished)
+    return SessionRead.model_validate(panel_session)
+
+
+@router.post("/{session_id}:stop", response_model=SessionRead, status_code=status.HTTP_202_ACCEPTED)
+def stop_session(
+    session_id: str,
+    request: Request,
+    db: Annotated[Session, Depends(get_db)],
+) -> SessionRead:
+    panel_session = get_session_or_404(db, session_id)
+    if panel_session.status == SessionStatus.COMPLETED.value:
+        return SessionRead.model_validate(panel_session)
+    state = request.app.state.discussion_states.get(session_id)
+    if state is None:
+        raise AppError(
+            "PANEL_INVALID_STATE", "当前讨论没有正在运行的任务。", status_code=409
+        )
+    state.stop_requested = True
     return SessionRead.model_validate(panel_session)
 
 
@@ -100,6 +122,36 @@ def get_transcript(
             )
         )
     return TranscriptList(items=items)
+
+
+@router.get("/{session_id}/branches", response_model=BranchList)
+def get_branches(
+    session_id: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> BranchList:
+    get_session_or_404(db, session_id)
+    rows = list(
+        db.scalars(
+            select(KnowledgeBranch)
+            .where(KnowledgeBranch.session_id == session_id)
+            .order_by(KnowledgeBranch.created_at)
+        )
+    )
+    return BranchList(items=[BranchRead.model_validate(row) for row in rows])
+
+
+@router.get("/{session_id}/summary", response_model=SummaryRead)
+def get_summary(
+    session_id: str,
+    db: Annotated[Session, Depends(get_db)],
+) -> SummaryRead:
+    get_session_or_404(db, session_id)
+    summary = db.scalar(
+        select(SessionSummary).where(SessionSummary.session_id == session_id)
+    )
+    if summary is None:
+        raise AppError("RESOURCE_NOT_FOUND", "这场讨论还没有生成总结。", status_code=404)
+    return SummaryRead.model_validate(summary)
 
 
 @router.get("/{session_id}/events")

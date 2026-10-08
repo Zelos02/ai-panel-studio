@@ -6,6 +6,7 @@ import { Brand } from "./components/Brand";
 import { ExpertRail } from "./components/ExpertRail";
 import { NewTopicPanel } from "./components/NewTopicPanel";
 import { PanelAdmission } from "./components/PanelAdmission";
+import { SummaryPanel } from "./components/SummaryPanel";
 import { TopicCard } from "./components/TopicCard";
 import { TranscriptPanel } from "./components/TranscriptPanel";
 import { useSessionEvents } from "./hooks/useSessionEvents";
@@ -39,6 +40,7 @@ export default function App() {
   const [liveExperts, setLiveExperts] = useState<ExpertPreview[]>([]);
   const [liveTranscript, setLiveTranscript] = useState<TranscriptPreview[]>([]);
   const [liveBranches, setLiveBranches] = useState<BranchPreview[]>([]);
+  const [summaryText, setSummaryText] = useState<string | null>(null);
   const [streamEnabled, setStreamEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -56,23 +58,27 @@ export default function App() {
     if (event.eventType === "session.state") {
       const status = String(event.payload.status);
       setActiveSession((current) => current ? { ...current, status } : current);
-      if (["completed", "failed"].includes(status)) setStreamEnabled(false);
+      if (status === "failed") setStreamEnabled(false);
     } else if (event.eventType === "expert.status") {
       const expertId = String(event.payload.expertId);
       setLiveExperts((current) => current.map((expert) => expert.id === expertId ? { ...expert, state: String(event.payload.state) as ExpertPreview["state"], publicFocus: String(event.payload.publicFocus || expert.publicFocus) } : expert));
     } else if (event.eventType === "transcript.append") {
       const message = event.payload.message as TranscriptResource;
       setLiveTranscript((current) => current.some((item) => item.id === message.id) ? current : [...current, { id: message.id, speakerId: message.speaker.id, content: message.content, time: new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt)) }]);
-      setActiveSession((current) => current && message.speaker.role === "expert" ? { ...current, turnCount: Math.max(current.turnCount, message.sequence - 1) } : current);
+      setActiveSession((current) => current && message.speaker.role === "expert" ? { ...current, turnCount: current.turnCount + 1 } : current);
     } else if (event.eventType === "branch.created") {
-      const branch = event.payload.branch as BranchPreview;
+      const raw = event.payload.branch as { id: string; branchType: BranchPreview["type"]; title: string; summary: string; sourceMessageId: string };
+      const branch: BranchPreview = { id: raw.id, type: raw.branchType, title: raw.title, summary: raw.summary, sourceMessageId: raw.sourceMessageId };
       setLiveBranches((current) => current.some((item) => item.id === branch.id) ? current : [...current, branch]);
+    } else if (event.eventType === "summary.ready") {
+      setSummaryText(String(event.payload.naturalText));
+      setStreamEnabled(false);
     } else if (event.eventType === "stream.error") {
       setPageError(String(event.payload.message || "讨论流暂时中断。"));
     }
   }
 
-  const streamActive = streamEnabled && !["completed", "failed"].includes(activeSession?.status ?? "");
+  const streamActive = streamEnabled && activeSession?.status !== "failed" && !(activeSession?.status === "completed" && summaryText);
   const { connectionState } = useSessionEvents(activeSession?.id ?? null, streamActive, handleSessionEvent);
 
   async function loadTopics() {
@@ -97,7 +103,27 @@ export default function App() {
       let panel: PanelResource;
       try { panel = await api.getPanel(topic.id); }
       catch (reason) { if (reason instanceof ApiError && reason.status === 404) panel = await api.generatePanel(topic.id); else throw reason; }
-      setActiveTopic(topic); setActivePanel(panel); setView("admission");
+      setActiveTopic(topic); setActivePanel(panel);
+      const sessions = await api.listSessions(topic.id);
+      if (sessions.length === 0) {
+        setView("admission");
+      } else {
+        const session = sessions[0];
+        const [messages, branchRows] = await Promise.all([
+          api.getTranscript(session.id),
+          api.getBranches(session.id),
+        ]);
+        let restoredSummary: string | null = null;
+        try { restoredSummary = (await api.getSummary(session.id)).naturalText; }
+        catch (reason) { if (!(reason instanceof ApiError && reason.status === 404)) throw reason; }
+        setActiveSession(session);
+        setLiveExperts([panel.host, ...panel.experts].map(toExpertPreview));
+        setLiveTranscript(messages.map((message) => ({ id: message.id, speakerId: message.speaker.id, content: message.content, time: new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit" }).format(new Date(message.createdAt)) })));
+        setLiveBranches(branchRows.map((branch) => ({ id: branch.id, type: branch.branchType, title: branch.title, summary: branch.summary, sourceMessageId: branch.sourceMessageId })));
+        setSummaryText(restoredSummary);
+        setStreamEnabled(["running", "stopping"].includes(session.status));
+        setView("studio");
+      }
     } catch (reason) { setPageError(reason instanceof Error ? reason.message : "无法打开这个话题。"); }
     finally { setBusy(false); }
   }
@@ -116,7 +142,7 @@ export default function App() {
     try {
       const admitted = await api.admitPanel(activeTopic.id, activePanel.generation);
       const session = await api.createSession(activeTopic.id);
-      setActivePanel(admitted); setActiveSession(session); setLiveExperts([admitted.host, ...admitted.experts].map(toExpertPreview)); setLiveTranscript([]); setLiveBranches([]); setView("studio");
+      setActivePanel(admitted); setActiveSession(session); setLiveExperts([admitted.host, ...admitted.experts].map(toExpertPreview)); setLiveTranscript([]); setLiveBranches([]); setSummaryText(null); setView("studio");
       await loadTopics();
     } catch (reason) { setPageError(reason instanceof Error ? reason.message : "确认阵容失败。"); }
     finally { setBusy(false); }
@@ -127,6 +153,14 @@ export default function App() {
     setBusy(true); setPageError(null); setStreamEnabled(true);
     try { setActiveSession(await api.startSession(activeSession.id)); }
     catch (reason) { setStreamEnabled(false); setPageError(reason instanceof Error ? reason.message : "启动讨论失败。"); }
+    finally { setBusy(false); }
+  }
+
+  async function stopDiscussion() {
+    if (!activeSession) return;
+    setBusy(true); setPageError(null);
+    try { await api.stopSession(activeSession.id); }
+    catch (reason) { setPageError(reason instanceof Error ? reason.message : "无法结束讨论。"); }
     finally { setBusy(false); }
   }
 
@@ -144,10 +178,10 @@ export default function App() {
         <header className="topbar">
           <button className="brand-button" type="button" onClick={leaveStudio}><Brand /></button>
           <div className="topic-titlebar"><span>{running ? "讨论进行中" : activeSession.status === "completed" ? "讨论已结束" : "等待开场"} · {activeSession.status}</span><strong>{activeTopic.title}</strong></div>
-          <div className="topbar-actions"><span className={`connection-pill connection-pill--${connectionState}`}><i /> {connectionLabel(connectionState)}</span>{activeSession.status === "admitted" && <button className="primary-button" type="button" disabled={busy} onClick={() => void startDiscussion()}>{busy ? "正在启动…" : "启动讨论"}</button>}</div>
+          <div className="topbar-actions"><span className={`connection-pill connection-pill--${connectionState}`}><i /> {connectionLabel(connectionState)}</span>{activeSession.status === "admitted" && <button className="primary-button" type="button" disabled={busy} onClick={() => void startDiscussion()}>{busy ? "正在启动…" : "启动讨论"}</button>}{running && <button className="danger-button" type="button" disabled={busy} onClick={() => void stopDiscussion()}>结束并总结</button>}</div>
         </header>
         {pageError && <div className="studio-error error-banner" role="alert">{pageError}</div>}
-        <main className="studio-grid"><ExpertRail experts={liveExperts} /><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} /><BranchPanel branches={liveBranches} /></main>
+        <main className="studio-grid"><ExpertRail experts={liveExperts} /><div className="studio-center"><TranscriptPanel experts={liveExperts} transcript={liveTranscript} isRunning={running} />{summaryText && <SummaryPanel text={summaryText} />}</div><BranchPanel branches={liveBranches} /></main>
         <footer className="studio-footer"><span>ROUND {String(activeSession.turnCount).padStart(2, "0")} / {activeSession.maxTurns}</span><div className="round-progress"><i style={{ width: `${progress}%` }} /></div><span>{running ? "专家正在自主判断发言时机" : activeSession.status === "completed" ? "讨论完成" : "等待主持人开场"}</span></footer>
       </div>
     );

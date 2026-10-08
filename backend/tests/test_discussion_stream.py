@@ -52,11 +52,17 @@ async def test_discussion_is_persisted_as_incremental_public_events(client):
 
     snapshot = client.get(f"/api/v1/sessions/{panel_session['id']}").json()
     transcript = client.get(f"/api/v1/sessions/{panel_session['id']}/transcript").json()["items"]
+    branches = client.get(f"/api/v1/sessions/{panel_session['id']}/branches").json()["items"]
+    summary = client.get(f"/api/v1/sessions/{panel_session['id']}/summary").json()
     assert snapshot["status"] == "completed"
     assert snapshot["turnCount"] == 4
     assert len(transcript) == 6  # host opening + four expert turns + host conclusion
     assert all("eventType" not in item for item in transcript)
     assert all(item["speaker"]["name"] for item in transcript)
+    assert len(branches) == 1  # repeated fake suggestions are deduplicated
+    assert branches[0]["sourceMessageId"] in {item["id"] for item in transcript}
+    assert summary["naturalText"]
+    assert not summary["naturalText"].lstrip().startswith("{")
 
     with client.app.state.session_factory() as db:
         events = EventStore(db).list_after(panel_session["id"], 0)
@@ -64,6 +70,12 @@ async def test_discussion_is_persisted_as_incremental_public_events(client):
     assert [event["eventId"] for event in events] == list(range(1, len(events) + 1))
     assert any(event["eventType"] == "transcript.append" for event in events)
     assert any(event["eventType"] == "expert.status" for event in events)
+    assert any(event["eventType"] == "branch.created" for event in events)
+    summary_event = next(event for event in events if event["eventType"] == "summary.ready")
+    assert set(summary_event["payload"]) == {"naturalText"}
+    branch_position = next(index for index, event in enumerate(events) if event["eventType"] == "branch.created")
+    completed_position = next(index for index, event in enumerate(events) if event["eventType"] == "session.state" and event["payload"].get("status") == "completed")
+    assert branch_position < completed_position
     assert all(status.state == "waiting" for status in statuses)
 
     frame = encode_sse(events[0])

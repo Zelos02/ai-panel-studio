@@ -142,6 +142,43 @@ class TranscriptList(ApiModel):
     items: list[TranscriptMessageRead]
 
 
+class SessionList(ApiModel):
+    items: list[SessionRead]
+
+
+class BranchRead(ApiModel):
+    id: str
+    branch_type: str
+    title: str
+    summary: str
+    source_message_id: str
+    created_at: datetime
+
+    @field_validator("created_at", mode="before")
+    @classmethod
+    def ensure_branch_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+class BranchList(ApiModel):
+    items: list[BranchRead]
+
+
+class SummaryRead(ApiModel):
+    natural_text: str
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def ensure_summary_utc(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
 class ErrorBody(ApiModel):
     code: str
     message: str

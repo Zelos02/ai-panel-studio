@@ -75,7 +75,7 @@ stateDiagram-v2
     [*] --> created
     created --> admitted: 锁定阵容
     admitted --> running: 用户启动
-    running -.-> paused: 后续暂停/恢复能力预留
+    running -.-> paused: 后续暂停或恢复能力预留
     paused -.-> running: start 可恢复预留状态
     running --> stopping: 用户停止或满足结束条件
     stopping --> completed: 主持人收尾并生成总结
